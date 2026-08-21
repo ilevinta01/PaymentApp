@@ -1,7 +1,7 @@
 FROM node:20-alpine AS build
 WORKDIR /repo
 RUN corepack enable && corepack prepare pnpm@10.34.5 --activate
-COPY pnpm-workspace.yaml package.json ./
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 COPY packages/shared/package.json packages/shared/
 COPY apps/backend/package.json apps/backend/
 RUN pnpm install --frozen-lockfile
