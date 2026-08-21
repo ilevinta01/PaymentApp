@@ -1,0 +1,17 @@
+{
+  "name": "oplata-app",
+  "private": true,
+  "version": "0.1.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "postinstall": "pnpm --filter @oplata/shared run build",
+    "dev:backend": "pnpm --filter @oplata/backend run start:dev",
+    "dev:frontend": "pnpm --filter @oplata/frontend run dev",
+    "build": "pnpm -r run build"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["@nestjs/core", "@prisma/client", "@prisma/engines", "bcrypt", "esbuild", "prisma"]
+  }
+}

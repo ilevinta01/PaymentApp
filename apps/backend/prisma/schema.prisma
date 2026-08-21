@@ -1,0 +1,172 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  TEACHER
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+}
+
+enum StudentStatus {
+  ACTIVE
+  SICK
+  VACATION
+  PAUSE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  BLOCKED
+}
+
+model Tenant {
+  id                     String              @id @default(uuid())
+  name                   String
+  subscriptionStatus     SubscriptionStatus  @default(ACTIVE)
+  subscriptionPaidUntil  DateTime
+  contractFileUrl        String?
+  contractUploadedAt     DateTime?
+  createdAt              DateTime            @default(now())
+
+  settings        TenantSettings?
+  users           User[]
+  groups          Group[]
+  students        Student[]
+  payments        Payment[]
+  paymentLogs     PaymentLog[]
+  cashCollections CashCollection[]
+}
+
+model TenantSettings {
+  tenantId         String  @id
+  tenant           Tenant  @relation(fields: [tenantId], references: [id])
+  isCardEnabled    Boolean @default(false)
+  telegramBotToken String?
+}
+
+// email уникален глобально по платформе (не в рамках тенанта), т.к. на экране логина
+// пользователь вводит только email+пароль без выбора тенанта.
+model User {
+  id           String   @id @default(uuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  email        String   @unique
+  passwordHash String
+  role         Role
+  fullName     String
+  phone        String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  groupsTaught         Group[]          @relation("GroupTeachers")
+  paymentsCreated      Payment[]        @relation("PaymentCreatedBy")
+  paymentLogsEdited    PaymentLog[]     @relation("PaymentLogEditedBy")
+  cashCollectedFrom    CashCollection[] @relation("CashCollectedFromTeacher")
+  cashCollectedBy      CashCollection[] @relation("CashCollectedByAdmin")
+
+  @@index([tenantId])
+}
+
+model Group {
+  id           String   @id @default(uuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  name         String
+  monthlyPrice Decimal  @db.Decimal(10, 2)
+  createdAt    DateTime @default(now())
+
+  // Группу может вести несколько преподавателей одновременно; Супер-Админ
+  // имеет доступ ко всем группам тенанта независимо от этой связи.
+  teachers User[]    @relation("GroupTeachers")
+  students Student[]
+
+  @@index([tenantId])
+}
+
+model Student {
+  id                   String         @id @default(uuid())
+  tenantId             String
+  tenant               Tenant         @relation(fields: [tenantId], references: [id])
+  groupId              String
+  group                Group          @relation(fields: [groupId], references: [id])
+  fullName             String
+  dateOfBirth          DateTime?
+  phone                String?
+  parentFullName       String?
+  parentPhone          String?
+  parentTelegramChatId String?
+  status               StudentStatus  @default(ACTIVE)
+  statusUntil          DateTime?
+  createdAt            DateTime       @default(now())
+
+  payments Payment[]
+
+  @@index([tenantId])
+  @@index([groupId])
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  tenantId      String
+  tenant        Tenant        @relation(fields: [tenantId], references: [id])
+  studentId     String
+  student       Student       @relation(fields: [studentId], references: [id])
+  amount        Decimal       @db.Decimal(10, 2)
+  paymentMethod PaymentMethod @default(CASH)
+  createdById   String
+  createdBy     User          @relation("PaymentCreatedBy", fields: [createdById], references: [id])
+  dateTime      DateTime      @default(now())
+  periodMonth   String
+
+  logs PaymentLog[]
+
+  @@index([tenantId])
+  @@index([studentId])
+  @@index([tenantId, periodMonth])
+}
+
+// Инкассация: фиксация факта изъятия наличных у преподавателя Супер-Админом,
+// чтобы можно было свести баланс "накопленной" наличности у каждого преподавателя.
+model CashCollection {
+  id            String   @id @default(uuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  teacherId     String
+  teacher       User     @relation("CashCollectedFromTeacher", fields: [teacherId], references: [id])
+  amount        Decimal  @db.Decimal(10, 2)
+  collectedById String
+  collectedBy   User     @relation("CashCollectedByAdmin", fields: [collectedById], references: [id])
+  collectedAt   DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([teacherId])
+}
+
+model PaymentLog {
+  id         String        @id @default(uuid())
+  tenantId   String
+  tenant     Tenant        @relation(fields: [tenantId], references: [id])
+  paymentId  String
+  payment    Payment       @relation(fields: [paymentId], references: [id])
+  editDate   DateTime      @default(now())
+  oldAmount  Decimal       @db.Decimal(10, 2)
+  newAmount  Decimal       @db.Decimal(10, 2)
+  oldMethod  PaymentMethod
+  newMethod  PaymentMethod
+  reason     String
+  editedById String
+  editedBy   User          @relation("PaymentLogEditedBy", fields: [editedById], references: [id])
+
+  @@index([tenantId])
+  @@index([paymentId])
+}

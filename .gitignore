@@ -1,0 +1,12 @@
+node_modules/
+dist/
+build/
+.env
+.env.local
+*.log
+.DS_Store
+apps/backend/generated/
+apps/backend/uploads/
+coverage/
+.turbo/
+pass.txt
