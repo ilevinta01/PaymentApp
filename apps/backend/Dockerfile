@@ -12,11 +12,11 @@ RUN pnpm --filter @oplata/backend run build
 FROM node:20-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
-COPY --from=build /repo/apps/backend/dist ./dist
-COPY --from=build /repo/apps/backend/prisma ./prisma
-COPY --from=build /repo/apps/backend/package.json ./package.json
 COPY --from=build /repo/node_modules ./node_modules
-COPY --from=build /repo/apps/backend/node_modules ./apps/backend/node_modules
 COPY --from=build /repo/packages/shared ./packages/shared
+COPY --from=build /repo/apps/backend/dist ./apps/backend/dist
+COPY --from=build /repo/apps/backend/prisma ./apps/backend/prisma
+COPY --from=build /repo/apps/backend/package.json ./apps/backend/package.json
+COPY --from=build /repo/apps/backend/node_modules ./apps/backend/node_modules
 EXPOSE 3001
-CMD ["node", "dist/main.js"]
+CMD ["node", "apps/backend/dist/main.js"]
