@@ -1,6 +1,6 @@
 FROM node:20-alpine AS build
 WORKDIR /repo
-RUN apk add --no-cache python3 make g++
+RUN apk add --no-cache python3 make g++ openssl
 RUN corepack enable && corepack prepare pnpm@10.34.5 --activate
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 COPY packages/shared packages/shared
@@ -11,6 +11,7 @@ RUN pnpm --filter @oplata/backend run build
 
 FROM node:20-alpine AS runtime
 WORKDIR /app
+RUN apk add --no-cache openssl
 ENV NODE_ENV=production
 COPY --from=build /repo/node_modules ./node_modules
 COPY --from=build /repo/packages/shared ./packages/shared
