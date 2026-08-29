@@ -241,12 +241,15 @@ export class IndividualLessonsService {
     });
 
     if (settings?.isTelegramEnabled && settings.telegramBotToken && participant.student.parentTelegramChatId) {
+      const collector = await this.prisma.user.findUnique({ where: { id: user.sub }, select: { fullName: true } });
       const text = [
         "Оплата индивидуального занятия получена",
         `Ученик: ${participant.student.fullName}`,
         `Преподаватель: ${participant.individualLesson.teacher.fullName}`,
+        `Дата занятия: ${formatDateTime(participant.individualLesson.startAt)}`,
         `Сумма: ${participant.shareAmount}`,
         `Способ: ${METHOD_LABEL[dto.paymentMethod]}`,
+        `Оплату принял(а): ${collector?.fullName ?? "—"}`,
       ].join("\n");
       await this.telegram.sendMessage(settings.telegramBotToken, participant.student.parentTelegramChatId, text);
     }
