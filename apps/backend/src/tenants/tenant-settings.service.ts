@@ -31,14 +31,6 @@ export class TenantSettingsService {
     });
   }
 
-  setLogo(tenantId: string, logoUrl: string) {
-    return this.prisma.tenantSettings.upsert({
-      where: { tenantId },
-      create: { tenantId, logoUrl },
-      update: { logoUrl },
-    });
-  }
-
   async getTelegramChats(tenantId: string) {
     const settings = await this.get(tenantId);
     if (!settings.telegramBotToken) {

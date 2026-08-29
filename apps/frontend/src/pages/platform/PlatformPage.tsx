@@ -1,15 +1,37 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { SubscriptionStatus, TenantSummaryDto } from "@oplata/shared";
-import { createTenant, downloadContract, getTenants, updateSubscription, uploadContract } from "../../api/platform";
+import {
+  createTenant,
+  downloadContract,
+  getTenants,
+  updateSubscription,
+  updateTenantBranding,
+  uploadContract,
+  uploadTenantLogo,
+} from "../../api/platform";
 import { clearPlatformKey, getPlatformKey, setPlatformKey } from "../../api/platformClient";
+
+const DEFAULT_COLOR = "#4f46e5";
 
 function TenantRow({ tenant, onChanged }: { tenant: TenantSummaryDto; onChanged: () => void }) {
   const [paidUntil, setPaidUntil] = useState(tenant.subscriptionPaidUntil.slice(0, 10));
+  const [color, setColor] = useState(tenant.primaryColor ?? DEFAULT_COLOR);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   const dateMutation = useMutation({
     mutationFn: () => updateSubscription(tenant.id, { subscriptionPaidUntil: paidUntil }),
+    onSuccess: onChanged,
+  });
+
+  const colorMutation = useMutation({
+    mutationFn: () => updateTenantBranding(tenant.id, color),
+    onSuccess: onChanged,
+  });
+
+  const logoMutation = useMutation({
+    mutationFn: (file: File) => uploadTenantLogo(tenant.id, file),
     onSuccess: onChanged,
   });
 
@@ -114,6 +136,47 @@ function TenantRow({ tenant, onChanged }: { tenant: TenantSummaryDto; onChanged:
         >
           {contractMutation.isPending ? "Загружаем…" : "Загрузить копию контракта"}
         </button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 rounded-lg bg-slate-50 px-3 py-2">
+        <span className="text-sm text-slate-600">Фирменный стиль:</span>
+        <div className="flex items-center gap-2">
+          <input
+            type="color"
+            value={color}
+            onChange={(e) => setColor(e.target.value)}
+            onBlur={() => colorMutation.mutate()}
+            className="h-8 w-8 cursor-pointer rounded border border-slate-300 p-0"
+          />
+          <span className="text-sm text-slate-500">{color}</span>
+        </div>
+        {colorMutation.isSuccess && <span className="text-sm text-emerald-600">Цвет сохранён</span>}
+
+        <div className="flex items-center gap-2">
+          {tenant.logoUrl ? (
+            <img src={tenant.logoUrl} alt="Логотип" className="h-8 max-w-[100px] object-contain" />
+          ) : (
+            <span className="text-sm text-slate-400">Логотип не загружен</span>
+          )}
+          <input
+            ref={logoInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/svg+xml"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) logoMutation.mutate(file);
+              e.target.value = "";
+            }}
+          />
+          <button
+            onClick={() => logoInputRef.current?.click()}
+            disabled={logoMutation.isPending}
+            className="rounded-lg border border-slate-300 px-3 py-1 text-sm text-slate-600 disabled:opacity-60"
+          >
+            {logoMutation.isPending ? "Загружаем…" : "Загрузить логотип"}
+          </button>
+        </div>
       </div>
     </li>
   );

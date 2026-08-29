@@ -12,6 +12,7 @@ export class PlatformService {
   async listTenants() {
     const tenants = await this.prisma.tenant.findMany({
       include: {
+        settings: { select: { primaryColor: true, logoUrl: true } },
         _count: { select: { users: true, students: true } },
         users: {
           where: { role: Role.SUPER_ADMIN },
@@ -33,6 +34,8 @@ export class PlatformService {
       studentsCount: tenant._count.students,
       contractFileUrl: tenant.contractFileUrl,
       contractUploadedAt: tenant.contractUploadedAt,
+      primaryColor: tenant.settings?.primaryColor ?? null,
+      logoUrl: tenant.settings?.logoUrl ?? null,
       owner: tenant.users[0] ?? null,
     }));
   }
@@ -89,6 +92,22 @@ export class PlatformService {
       where: { id: tenantId },
       data: { contractFileUrl: filename, contractUploadedAt: new Date() },
       select: { id: true, contractFileUrl: true, contractUploadedAt: true },
+    });
+  }
+
+  updateBranding(tenantId: string, primaryColor: string) {
+    return this.prisma.tenantSettings.upsert({
+      where: { tenantId },
+      create: { tenantId, primaryColor },
+      update: { primaryColor },
+    });
+  }
+
+  saveLogo(tenantId: string, logoUrl: string) {
+    return this.prisma.tenantSettings.upsert({
+      where: { tenantId },
+      create: { tenantId, logoUrl },
+      update: { logoUrl },
     });
   }
 }

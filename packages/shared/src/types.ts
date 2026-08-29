@@ -101,6 +101,8 @@ export interface TenantSummaryDto {
   studentsCount: number;
   contractFileUrl: string | null;
   contractUploadedAt: string | null;
+  primaryColor: string | null;
+  logoUrl: string | null;
   owner: { fullName: string; email: string; phone: string | null } | null;
 }
 

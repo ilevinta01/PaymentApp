@@ -34,6 +34,20 @@ export async function uploadContract(tenantId: string, file: File) {
   return data;
 }
 
+export async function updateTenantBranding(tenantId: string, primaryColor: string) {
+  const { data } = await platformClient.patch(`/platform/tenants/${tenantId}/branding`, { primaryColor });
+  return data;
+}
+
+export async function uploadTenantLogo(tenantId: string, file: File) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const { data } = await platformClient.post(`/platform/tenants/${tenantId}/logo`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data;
+}
+
 // Скачивание требует заголовок x-platform-key, поэтому обычная <a href> ссылка не подходит —
 // грузим файл через тот же авторизованный клиент и открываем как Blob.
 export async function downloadContract(tenantId: string, tenantName: string): Promise<void> {
