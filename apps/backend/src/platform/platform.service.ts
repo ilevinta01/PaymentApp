@@ -1,10 +1,19 @@
 import { BadRequestException, ConflictException, Injectable } from "@nestjs/common";
 import * as bcrypt from "bcrypt";
-import { Role, SubscriptionStatus } from "@oplata/shared";
+import { FEATURE_DEFINITIONS, Role, SubscriptionStatus } from "@oplata/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateTenantDto } from "./dto/create-tenant.dto";
 import { UpdateFeaturesDto } from "./dto/update-features.dto";
 import { UpdateSubscriptionDto } from "./dto/update-subscription.dto";
+
+export type EffectiveTenantStatus = "ACTIVE" | "UNPAID" | "BLOCKED";
+
+function getEffectiveStatus(tenant: { subscriptionStatus: string; subscriptionPaidUntil: Date }): EffectiveTenantStatus {
+  if (tenant.subscriptionStatus === SubscriptionStatus.BLOCKED) return "BLOCKED";
+  const now = new Date();
+  const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  return tenant.subscriptionPaidUntil >= firstDayOfMonth ? "ACTIVE" : "UNPAID";
+}
 
 @Injectable()
 export class PlatformService {
@@ -38,6 +47,7 @@ export class PlatformService {
       id: tenant.id,
       name: tenant.name,
       subscriptionStatus: tenant.subscriptionStatus,
+      effectiveStatus: getEffectiveStatus(tenant),
       subscriptionPaidUntil: tenant.subscriptionPaidUntil,
       createdAt: tenant.createdAt,
       usersCount: tenant._count.users,
@@ -130,6 +140,20 @@ export class PlatformService {
       where: { tenantId },
       create: { tenantId, ...dto },
       update: dto,
+    });
+  }
+
+  async getFeaturePrices() {
+    const prices = await this.prisma.featurePrice.findMany();
+    const priceByKey = new Map(prices.map((p) => [p.key, Number(p.price)]));
+    return FEATURE_DEFINITIONS.map((def) => ({ ...def, price: priceByKey.get(def.key) ?? 0 }));
+  }
+
+  updateFeaturePrice(key: string, price: number) {
+    return this.prisma.featurePrice.upsert({
+      where: { key },
+      create: { key, price },
+      update: { price },
     });
   }
 }

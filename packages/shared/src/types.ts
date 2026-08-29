@@ -98,6 +98,7 @@ export interface TenantSummaryDto {
   id: string;
   name: string;
   subscriptionStatus: SubscriptionStatus;
+  effectiveStatus: "ACTIVE" | "UNPAID" | "BLOCKED";
   subscriptionPaidUntil: string;
   createdAt: string;
   usersCount: number;

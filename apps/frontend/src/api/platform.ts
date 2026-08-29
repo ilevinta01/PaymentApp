@@ -1,4 +1,4 @@
-import { SubscriptionStatus, TenantSummaryDto } from "@oplata/shared";
+import { FeaturePriceDto, SubscriptionStatus, TenantSummaryDto } from "@oplata/shared";
 import { platformClient } from "./platformClient";
 
 export async function getTenants(): Promise<TenantSummaryDto[]> {
@@ -58,6 +58,16 @@ export async function updateTenantFeatures(
   }>,
 ) {
   const { data } = await platformClient.patch(`/platform/tenants/${tenantId}/features`, features);
+  return data;
+}
+
+export async function getFeaturePrices(): Promise<FeaturePriceDto[]> {
+  const { data } = await platformClient.get<FeaturePriceDto[]>("/platform/features");
+  return data;
+}
+
+export async function updateFeaturePrice(key: string, price: number) {
+  const { data } = await platformClient.patch(`/platform/features/${key}`, { price });
   return data;
 }
 

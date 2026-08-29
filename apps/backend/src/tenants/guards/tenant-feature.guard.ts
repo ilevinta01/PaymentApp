@@ -1,8 +1,8 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
-import { JwtPayload } from "@oplata/shared";
+import { FeatureKey, JwtPayload } from "@oplata/shared";
 import { PrismaService } from "../../prisma/prisma.service";
-import { FEATURE_KEY, TenantFeature } from "../decorators/require-feature.decorator";
+import { FEATURE_KEY } from "../decorators/require-feature.decorator";
 
 // Позволяет владельцу платформы продавать функции по отдельности: если у тенанта функция
 // не подключена, соответствующий эндпоинт недоступен, даже если роль пользователя подходит.
@@ -14,7 +14,7 @@ export class TenantFeatureGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const feature = this.reflector.getAllAndOverride<TenantFeature | undefined>(FEATURE_KEY, [
+    const feature = this.reflector.getAllAndOverride<FeatureKey | undefined>(FEATURE_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
