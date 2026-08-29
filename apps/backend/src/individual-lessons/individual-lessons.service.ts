@@ -21,6 +21,11 @@ function formatDateTime(date: Date): string {
   return date.toLocaleString("ru-RU", { dateStyle: "long", timeStyle: "short", timeZone: "Europe/Chisinau" });
 }
 
+const METHOD_LABEL: Record<PaymentMethod, string> = {
+  [PaymentMethod.CASH]: "Наличные",
+  [PaymentMethod.CARD]: "Карта",
+};
+
 @Injectable()
 export class IndividualLessonsService {
   constructor(
@@ -88,7 +93,10 @@ export class IndividualLessonsService {
   async markParticipantPaid(tenantId: string, user: JwtPayload, participantId: string, dto: MarkParticipantPaidDto) {
     const participant = await this.prisma.individualLessonParticipant.findFirst({
       where: { id: participantId, individualLesson: { tenantId } },
-      include: { individualLesson: true },
+      include: {
+        student: true,
+        individualLesson: { include: { teacher: { select: { fullName: true } } } },
+      },
     });
     if (!participant) throw new NotFoundException("Участник занятия не найден");
 
@@ -96,17 +104,29 @@ export class IndividualLessonsService {
       throw new ForbiddenException("Это занятие ведёт другой преподаватель");
     }
 
-    if (dto.paymentMethod === PaymentMethod.CARD) {
-      const settings = await this.prisma.tenantSettings.findUnique({ where: { tenantId } });
-      if (!settings?.isCardEnabled) {
-        throw new ForbiddenException("Оплата картой не включена в настройках детского центра");
-      }
+    const settings = await this.prisma.tenantSettings.findUnique({ where: { tenantId } });
+
+    if (dto.paymentMethod === PaymentMethod.CARD && !settings?.isCardEnabled) {
+      throw new ForbiddenException("Оплата картой не включена в настройках детского центра");
     }
 
-    return this.prisma.individualLessonParticipant.update({
+    const updated = await this.prisma.individualLessonParticipant.update({
       where: { id: participantId },
       data: { isPaid: true, paymentMethod: dto.paymentMethod, paidAt: new Date() },
     });
+
+    if (settings?.isTelegramEnabled && settings.telegramBotToken && participant.student.parentTelegramChatId) {
+      const text = [
+        "Оплата индивидуального занятия получена",
+        `Ученик: ${participant.student.fullName}`,
+        `Преподаватель: ${participant.individualLesson.teacher.fullName}`,
+        `Сумма: ${participant.shareAmount}`,
+        `Способ: ${METHOD_LABEL[dto.paymentMethod]}`,
+      ].join("\n");
+      await this.telegram.sendMessage(settings.telegramBotToken, participant.student.parentTelegramChatId, text);
+    }
+
+    return updated;
   }
 
   private async sendNotifications(
