@@ -39,7 +39,7 @@ export default function TeacherEarningsPage() {
           <div key={teacher.teacherId} className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="flex items-center justify-between">
               <p className="font-semibold text-slate-900">{teacher.teacherName}</p>
-              <p className="font-semibold text-indigo-600">{teacher.totalAmount}</p>
+              <p className="font-semibold text-[var(--brand-primary)]">{teacher.totalAmount}</p>
             </div>
             <ul className="mt-2 divide-y divide-slate-100 text-sm">
               {teacher.payments.map((payment) => (

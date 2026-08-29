@@ -24,7 +24,7 @@ function GroupCheckboxes({
           key={group.id}
           className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm ${
             selected.includes(group.id)
-              ? "border-indigo-600 bg-indigo-50 text-indigo-700"
+              ? "border-[var(--brand-primary)] bg-[var(--brand-primary-light)] text-[var(--brand-primary-dark)]"
               : "border-slate-300 text-slate-600"
           }`}
         >
@@ -99,7 +99,7 @@ function StaffRow({
               </p>
               <button
                 onClick={() => setEditingGroups(true)}
-                className="text-sm font-medium text-indigo-600"
+                className="text-sm font-medium text-[var(--brand-primary)]"
               >
                 Изменить
               </button>
@@ -111,7 +111,7 @@ function StaffRow({
                 <button
                   onClick={() => groupsMutation.mutate()}
                   disabled={groupsMutation.isPending}
-                  className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60"
+                  className="rounded-lg bg-[var(--brand-primary)] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60"
                 >
                   Сохранить
                 </button>
@@ -221,7 +221,7 @@ export default function StaffPage() {
         )}
         <button
           disabled={mutation.isPending}
-          className="w-full rounded-lg bg-indigo-600 py-2.5 font-medium text-white disabled:opacity-60 sm:w-auto sm:px-4"
+          className="w-full rounded-lg bg-[var(--brand-primary)] py-2.5 font-medium text-white disabled:opacity-60 sm:w-auto sm:px-4"
         >
           {mutation.isPending ? "Сохраняем…" : "Добавить сотрудника"}
         </button>

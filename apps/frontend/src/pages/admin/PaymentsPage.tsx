@@ -42,7 +42,7 @@ function EditablePaymentRow({
           <span className="text-slate-500">
             {payment.amount} · {METHOD_LABEL[payment.paymentMethod]}
           </span>
-          <button onClick={() => setEditing(true)} className="text-sm text-indigo-600 font-medium">
+          <button onClick={() => setEditing(true)} className="text-sm text-[var(--brand-primary)] font-medium">
             Изменить
           </button>
         </div>
@@ -83,7 +83,7 @@ function EditablePaymentRow({
         <button
           onClick={() => mutation.mutate()}
           disabled={mutation.isPending || reason.trim().length < 3}
-          className="rounded-lg bg-indigo-600 text-white px-3 py-1.5 text-sm font-medium disabled:opacity-60"
+          className="rounded-lg bg-[var(--brand-primary)] text-white px-3 py-1.5 text-sm font-medium disabled:opacity-60"
         >
           Сохранить
         </button>
@@ -184,7 +184,7 @@ export default function PaymentsPage() {
         )}
         <button
           disabled={createMutation.isPending}
-          className="rounded-lg bg-indigo-600 text-white px-4 py-2 font-medium disabled:opacity-60"
+          className="rounded-lg bg-[var(--brand-primary)] text-white px-4 py-2 font-medium disabled:opacity-60"
         >
           {createMutation.isPending ? "Сохраняем…" : "Записать оплату"}
         </button>

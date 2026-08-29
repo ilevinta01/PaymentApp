@@ -119,7 +119,7 @@ export default function AddStudentPage() {
         <TelegramChatPicker onSelect={(chatId) => setForm({ ...form, parentTelegramChatId: chatId })} />
         <button
           disabled={mutation.isPending}
-          className="w-full rounded-lg bg-indigo-600 py-2.5 font-medium text-white disabled:opacity-60"
+          className="w-full rounded-lg bg-[var(--brand-primary)] py-2.5 font-medium text-white disabled:opacity-60"
         >
           {mutation.isPending ? "Сохраняем…" : "Добавить ученика"}
         </button>

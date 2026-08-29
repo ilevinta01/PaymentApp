@@ -28,7 +28,7 @@ function EditableGroupRow({ group, onChanged }: { group: GroupDto; onChanged: ()
               setPrice(group.monthlyPrice);
               setEditing(true);
             }}
-            className="text-sm font-medium text-indigo-600"
+            className="text-sm font-medium text-[var(--brand-primary)]"
           >
             Изменить
           </button>
@@ -57,7 +57,7 @@ function EditableGroupRow({ group, onChanged }: { group: GroupDto; onChanged: ()
         <button
           onClick={() => mutation.mutate()}
           disabled={mutation.isPending || !name.trim()}
-          className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60"
+          className="rounded-lg bg-[var(--brand-primary)] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60"
         >
           {mutation.isPending ? "Сохраняем…" : "Сохранить"}
         </button>
@@ -116,7 +116,7 @@ export default function GroupsPage() {
           required
           className="w-32 rounded-lg border border-slate-300 px-3 py-2"
         />
-        <button className="rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white">Добавить</button>
+        <button className="rounded-lg bg-[var(--brand-primary)] px-4 py-2 font-medium text-white">Добавить</button>
       </form>
       <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
         {groups?.map((group) => (

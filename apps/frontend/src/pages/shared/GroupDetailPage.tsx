@@ -34,7 +34,7 @@ export default function GroupDetailPage() {
           {group && <p className="text-sm text-slate-500">{group.monthlyPrice} / мес</p>}
         </div>
         {isAdmin && groupId && (
-          <Link to={`/admin/students/new?groupId=${groupId}`} className="text-sm font-medium text-indigo-600">
+          <Link to={`/admin/students/new?groupId=${groupId}`} className="text-sm font-medium text-[var(--brand-primary)]">
             + Добавить ученика
           </Link>
         )}

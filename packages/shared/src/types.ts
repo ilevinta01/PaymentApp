@@ -21,6 +21,8 @@ export interface AuthResponse {
 export interface TenantSettingsDto {
   isCardEnabled: boolean;
   telegramBotToken: string | null;
+  primaryColor: string | null;
+  logoUrl: string | null;
 }
 
 export interface TelegramChatOptionDto {

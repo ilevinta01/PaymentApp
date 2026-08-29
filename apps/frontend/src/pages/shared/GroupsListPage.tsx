@@ -15,7 +15,7 @@ export default function GroupsListPage() {
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-slate-900">Группы</h2>
         {isAdmin && (
-          <Link to="/admin/groups/manage" className="text-sm font-medium text-indigo-600">
+          <Link to="/admin/groups/manage" className="text-sm font-medium text-[var(--brand-primary)]">
             Добавить / Изменить
           </Link>
         )}

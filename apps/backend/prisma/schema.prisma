@@ -53,6 +53,8 @@ model TenantSettings {
   tenant           Tenant  @relation(fields: [tenantId], references: [id])
   isCardEnabled    Boolean @default(false)
   telegramBotToken String?
+  primaryColor     String?
+  logoUrl          String?
 }
 
 // email уникален глобально по платформе (не в рамках тенанта), т.к. на экране логина

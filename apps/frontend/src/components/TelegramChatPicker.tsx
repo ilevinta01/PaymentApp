@@ -21,7 +21,7 @@ export default function TelegramChatPicker({ onSelect }: { onSelect: (chatId: st
           setOpen(true);
           refetch();
         }}
-        className="text-sm font-medium text-indigo-600"
+        className="text-sm font-medium text-[var(--brand-primary)]"
       >
         Найти чат родителя
       </button>

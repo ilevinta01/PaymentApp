@@ -12,7 +12,15 @@ export class TenantSettingsService {
 
   async get(tenantId: string) {
     const settings = await this.prisma.tenantSettings.findUnique({ where: { tenantId } });
-    return settings ?? { tenantId, isCardEnabled: false, telegramBotToken: null };
+    return (
+      settings ?? {
+        tenantId,
+        isCardEnabled: false,
+        telegramBotToken: null,
+        primaryColor: null,
+        logoUrl: null,
+      }
+    );
   }
 
   update(tenantId: string, dto: UpdateTenantSettingsDto) {
@@ -20,6 +28,14 @@ export class TenantSettingsService {
       where: { tenantId },
       create: { tenantId, ...dto },
       update: dto,
+    });
+  }
+
+  setLogo(tenantId: string, logoUrl: string) {
+    return this.prisma.tenantSettings.upsert({
+      where: { tenantId },
+      create: { tenantId, logoUrl },
+      update: { logoUrl },
     });
   }
 

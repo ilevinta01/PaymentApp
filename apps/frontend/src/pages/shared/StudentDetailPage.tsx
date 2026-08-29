@@ -162,7 +162,7 @@ export default function StudentDetailPage() {
           <button
             onClick={() => paymentMutation.mutate()}
             disabled={paymentMutation.isPending || (isAdmin && !amount)}
-            className="w-full rounded-lg bg-indigo-600 py-2.5 font-medium text-white disabled:opacity-60"
+            className="w-full rounded-lg bg-[var(--brand-primary)] py-2.5 font-medium text-white disabled:opacity-60"
           >
             {paymentMutation.isPending ? "Сохраняем…" : "Записать оплату"}
           </button>
@@ -174,7 +174,7 @@ export default function StudentDetailPage() {
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-slate-900">Контактные данные</h3>
           {isAdmin && (
-            <button onClick={() => setEditing((v) => !v)} className="text-sm font-medium text-indigo-600">
+            <button onClick={() => setEditing((v) => !v)} className="text-sm font-medium text-[var(--brand-primary)]">
               {editing ? "Отмена" : "Изменить"}
             </button>
           )}
@@ -260,7 +260,7 @@ export default function StudentDetailPage() {
             <TelegramChatPicker onSelect={(chatId) => setForm({ ...form, parentTelegramChatId: chatId })} />
             <button
               disabled={updateMutation.isPending}
-              className="w-full rounded-lg bg-indigo-600 py-2.5 font-medium text-white disabled:opacity-60"
+              className="w-full rounded-lg bg-[var(--brand-primary)] py-2.5 font-medium text-white disabled:opacity-60"
             >
               {updateMutation.isPending ? "Сохраняем…" : "Сохранить"}
             </button>

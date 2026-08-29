@@ -1,4 +1,4 @@
-import { IsBoolean, IsOptional, IsString } from "class-validator";
+import { IsBoolean, IsHexColor, IsOptional, IsString } from "class-validator";
 
 export class UpdateTenantSettingsDto {
   @IsOptional()
@@ -8,4 +8,8 @@ export class UpdateTenantSettingsDto {
   @IsOptional()
   @IsString()
   telegramBotToken?: string;
+
+  @IsOptional()
+  @IsHexColor()
+  primaryColor?: string;
 }

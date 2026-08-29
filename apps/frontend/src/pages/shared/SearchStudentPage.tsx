@@ -23,7 +23,7 @@ export default function SearchStudentPage() {
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-slate-900">Ученики</h2>
         {isAdmin && (
-          <Link to="/admin/students/new" className="text-sm font-medium text-indigo-600">
+          <Link to="/admin/students/new" className="text-sm font-medium text-[var(--brand-primary)]">
             + Добавить ученика
           </Link>
         )}
