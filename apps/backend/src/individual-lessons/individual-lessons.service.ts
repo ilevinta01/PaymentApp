@@ -18,6 +18,48 @@ function splitEvenly(total: number, count: number): number[] {
   return Array.from({ length: count }, (_, i) => (baseCents + (i < remainder ? 1 : 0)) / 100);
 }
 
+// Prisma include-запросы возвращают вложенные объекты (teacher.fullName, participant.student.fullName),
+// а фронтенд ждёт плоские поля teacherName/studentName — приводим форму здесь, в одном месте.
+function mapLesson(lesson: {
+  id: string;
+  teacherId: string;
+  teacher: { fullName: string };
+  startAt: Date;
+  durationMinutes: number;
+  hourlyRateSnapshot: unknown;
+  totalPrice: unknown;
+  createdAt: Date;
+  participants: {
+    id: string;
+    studentId: string;
+    student: { fullName: string };
+    shareAmount: unknown;
+    isPaid: boolean;
+    paymentMethod: string | null;
+    paidAt: Date | null;
+  }[];
+}) {
+  return {
+    id: lesson.id,
+    teacherId: lesson.teacherId,
+    teacherName: lesson.teacher.fullName,
+    startAt: lesson.startAt,
+    durationMinutes: lesson.durationMinutes,
+    hourlyRateSnapshot: lesson.hourlyRateSnapshot,
+    totalPrice: lesson.totalPrice,
+    createdAt: lesson.createdAt,
+    participants: lesson.participants.map((p) => ({
+      id: p.id,
+      studentId: p.studentId,
+      studentName: p.student.fullName,
+      shareAmount: p.shareAmount,
+      isPaid: p.isPaid,
+      paymentMethod: p.paymentMethod,
+      paidAt: p.paidAt,
+    })),
+  };
+}
+
 function formatDateTime(date: Date): string {
   return date.toLocaleString("ru-RU", { dateStyle: "long", timeStyle: "short", timeZone: "Europe/Chisinau" });
 }
@@ -34,20 +76,43 @@ export class IndividualLessonsService {
     private readonly telegram: TelegramService,
   ) {}
 
-  findAll(tenantId: string, user: JwtPayload) {
-    return this.prisma.individualLesson.findMany({
+  async findAll(tenantId: string, user: JwtPayload) {
+    const lessons = await this.prisma.individualLesson.findMany({
       where: { tenantId, ...(user.role === Role.TEACHER ? { teacherId: user.sub } : {}) },
       include: WITH_DETAILS,
       orderBy: { startAt: "desc" },
     });
+    return lessons.map(mapLesson);
   }
 
-  findForStudent(tenantId: string, studentId: string) {
-    return this.prisma.individualLessonParticipant.findMany({
+  async findForStudent(tenantId: string, studentId: string) {
+    const rows = await this.prisma.individualLessonParticipant.findMany({
       where: { studentId, individualLesson: { tenantId } },
-      include: { individualLesson: { include: { teacher: { select: { id: true, fullName: true } } } } },
+      include: {
+        student: { select: { fullName: true } },
+        individualLesson: { include: { teacher: { select: { id: true, fullName: true } } } },
+      },
       orderBy: { individualLesson: { startAt: "desc" } },
     });
+    return rows.map((p) => ({
+      id: p.id,
+      studentId: p.studentId,
+      studentName: p.student.fullName,
+      shareAmount: p.shareAmount,
+      isPaid: p.isPaid,
+      paymentMethod: p.paymentMethod,
+      paidAt: p.paidAt,
+      individualLesson: {
+        id: p.individualLesson.id,
+        teacherId: p.individualLesson.teacherId,
+        teacherName: p.individualLesson.teacher.fullName,
+        startAt: p.individualLesson.startAt,
+        durationMinutes: p.individualLesson.durationMinutes,
+        hourlyRateSnapshot: p.individualLesson.hourlyRateSnapshot,
+        totalPrice: p.individualLesson.totalPrice,
+        createdAt: p.individualLesson.createdAt,
+      },
+    }));
   }
 
   async create(tenantId: string, user: JwtPayload, dto: CreateIndividualLessonDto) {
@@ -88,7 +153,7 @@ export class IndividualLessonsService {
 
     await this.sendNotifications(tenantId, lesson, "created");
 
-    return lesson;
+    return mapLesson(lesson);
   }
 
   async update(tenantId: string, user: JwtPayload, lessonId: string, dto: UpdateIndividualLessonDto) {
@@ -135,7 +200,7 @@ export class IndividualLessonsService {
 
     await this.sendNotifications(tenantId, updated, "updated");
 
-    return updated;
+    return mapLesson(updated);
   }
 
   async markParticipantPaid(tenantId: string, user: JwtPayload, participantId: string, dto: MarkParticipantPaidDto) {
