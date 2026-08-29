@@ -12,14 +12,13 @@ export default defineConfig({
         name: "Оплата — учёт платежей",
         short_name: "Оплата",
         description: "Учёт оплат и контроль задолженностей для детских центров",
-        theme_color: "#4F46E5",
-        background_color: "#ffffff",
+        theme_color: "#0b0e1a",
+        background_color: "#0b0e1a",
         display: "standalone",
         start_url: "/",
         icons: [
           { src: "icons/icon-192.png", sizes: "192x192", type: "image/png" },
           { src: "icons/icon-512.png", sizes: "512x512", type: "image/png" },
-          { src: "icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
         ],
       },
       workbox: {
