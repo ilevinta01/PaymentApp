@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Param, Post } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
 import { JwtPayload, Role } from "@oplata/shared";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { RequireFeature } from "../tenants/decorators/require-feature.decorator";
 import { CreateIndividualLessonDto } from "./dto/create-individual-lesson.dto";
 import { MarkParticipantPaidDto } from "./dto/mark-participant-paid.dto";
+import { UpdateIndividualLessonDto } from "./dto/update-individual-lesson.dto";
 import { IndividualLessonsService } from "./individual-lessons.service";
 
 @RequireFeature("isIndividualLessonsEnabled")
@@ -26,6 +27,11 @@ export class IndividualLessonsController {
   @Post()
   create(@CurrentUser() user: JwtPayload, @Body() dto: CreateIndividualLessonDto) {
     return this.service.create(user.tenantId, user, dto);
+  }
+
+  @Patch(":id")
+  update(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Body() dto: UpdateIndividualLessonDto) {
+    return this.service.update(user.tenantId, user, id, dto);
   }
 
   @Post("participants/:participantId/pay")

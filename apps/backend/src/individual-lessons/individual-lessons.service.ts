@@ -4,6 +4,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { TelegramService } from "../telegram/telegram.service";
 import { CreateIndividualLessonDto } from "./dto/create-individual-lesson.dto";
 import { MarkParticipantPaidDto } from "./dto/mark-participant-paid.dto";
+import { UpdateIndividualLessonDto } from "./dto/update-individual-lesson.dto";
 
 const WITH_DETAILS = {
   teacher: { select: { id: true, fullName: true } },
@@ -85,9 +86,56 @@ export class IndividualLessonsService {
       include: WITH_DETAILS,
     });
 
-    await this.sendNotifications(tenantId, lesson);
+    await this.sendNotifications(tenantId, lesson, "created");
 
     return lesson;
+  }
+
+  async update(tenantId: string, user: JwtPayload, lessonId: string, dto: UpdateIndividualLessonDto) {
+    const lesson = await this.prisma.individualLesson.findFirst({ where: { id: lessonId, tenantId }, include: WITH_DETAILS });
+    if (!lesson) throw new NotFoundException("Занятие не найдено");
+
+    if (user.role === Role.TEACHER && lesson.teacherId !== user.sub) {
+      throw new ForbiddenException("Это занятие ведёт другой преподаватель");
+    }
+
+    const newStartAt = dto.startAt ? new Date(dto.startAt) : lesson.startAt;
+    const newDuration = dto.durationMinutes ?? lesson.durationMinutes;
+
+    let newTotalPrice = Number(lesson.totalPrice);
+    const shareUpdates: { id: string; shareAmount: number }[] = [];
+
+    if (dto.durationMinutes !== undefined && dto.durationMinutes !== lesson.durationMinutes) {
+      newTotalPrice = Math.round(Number(lesson.hourlyRateSnapshot) * (newDuration / 60) * 100) / 100;
+
+      const paid = lesson.participants.filter((p) => p.isPaid);
+      const unpaid = lesson.participants.filter((p) => !p.isPaid);
+      const paidTotal = paid.reduce((sum, p) => sum + Number(p.shareAmount), 0);
+      const remaining = Math.max(0, Math.round((newTotalPrice - paidTotal) * 100) / 100);
+
+      if (unpaid.length > 0) {
+        const shares = splitEvenly(remaining, unpaid.length);
+        unpaid.forEach((p, i) => shareUpdates.push({ id: p.id, shareAmount: shares[i] }));
+      } else if (paidTotal !== newTotalPrice) {
+        // Все уже оплатили — не меняем задним числом то, что уже собрано.
+        newTotalPrice = paidTotal;
+      }
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.individualLesson.update({
+        where: { id: lessonId },
+        data: { startAt: newStartAt, durationMinutes: newDuration, totalPrice: newTotalPrice },
+      });
+      for (const s of shareUpdates) {
+        await tx.individualLessonParticipant.update({ where: { id: s.id }, data: { shareAmount: s.shareAmount } });
+      }
+      return tx.individualLesson.findUniqueOrThrow({ where: { id: lessonId }, include: WITH_DETAILS });
+    });
+
+    await this.sendNotifications(tenantId, updated, "updated");
+
+    return updated;
   }
 
   async markParticipantPaid(tenantId: string, user: JwtPayload, participantId: string, dto: MarkParticipantPaidDto) {
@@ -138,17 +186,21 @@ export class IndividualLessonsService {
       teacher: { id: string; fullName: string };
       participants: { shareAmount: unknown; student: { id: string; fullName: string } }[];
     },
+    kind: "created" | "updated",
   ) {
     const settings = await this.prisma.tenantSettings.findUnique({ where: { tenantId } });
     if (!settings?.isTelegramEnabled || !settings.telegramBotToken) return;
 
     const when = formatDateTime(lesson.startAt);
     const studentNames = lesson.participants.map((p) => p.student.fullName).join(", ");
+    const teacherHeader = kind === "created" ? "Новое индивидуальное занятие" : "Изменено индивидуальное занятие";
+    const parentHeader =
+      kind === "created" ? "Назначено индивидуальное занятие" : "Изменено индивидуальное занятие";
 
     const teacherFull = await this.prisma.user.findUnique({ where: { id: lesson.teacher.id } });
     if (teacherFull?.telegramChatId) {
       const text = [
-        "Новое индивидуальное занятие",
+        teacherHeader,
         `Дата и время: ${when}`,
         `Длительность: ${lesson.durationMinutes} мин`,
         `Ученики: ${studentNames}`,
@@ -164,7 +216,7 @@ export class IndividualLessonsService {
       const student = students.find((s) => s.id === participant.student.id);
       if (!student?.parentTelegramChatId) continue;
       const text = [
-        "Назначено индивидуальное занятие",
+        parentHeader,
         `Ученик: ${student.fullName}`,
         `Преподаватель: ${lesson.teacher.fullName}`,
         `Дата и время: ${when}`,

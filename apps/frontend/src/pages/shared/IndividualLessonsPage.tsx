@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { PaymentMethod, Role } from "@oplata/shared";
+import { IndividualLessonDto, PaymentMethod, Role } from "@oplata/shared";
 import {
   createIndividualLesson,
   getIndividualLessons,
   markIndividualLessonParticipantPaid,
+  updateIndividualLesson,
 } from "../../api/individualLessons";
 import { getStaff } from "../../api/users";
 import { getStudents } from "../../api/students";
@@ -193,8 +194,160 @@ function CreateLessonForm({ onCreated }: { onCreated: () => void }) {
   );
 }
 
+function EditLessonForm({ lesson, onDone }: { lesson: IndividualLessonDto; onDone: () => void }) {
+  const start = new Date(lesson.startAt);
+  const [date, setDate] = useState(start.toISOString().slice(0, 10));
+  const [hour, setHour] = useState(String(start.getHours()).padStart(2, "0"));
+  const [minute, setMinute] = useState(String(Math.floor(start.getMinutes() / 5) * 5).padStart(2, "0"));
+  const [durationMinutes, setDurationMinutes] = useState(lesson.durationMinutes);
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      updateIndividualLesson(lesson.id, {
+        startAt: new Date(`${date}T${hour}:${minute}`).toISOString(),
+        durationMinutes,
+      }),
+    onSuccess: onDone,
+  });
+
+  return (
+    <div className="space-y-2 rounded-lg bg-slate-50 p-3">
+      <div className="flex flex-wrap gap-2">
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="flex-1 rounded-lg border border-slate-300 px-3 py-2"
+        />
+        <select
+          value={hour}
+          onChange={(e) => setHour(e.target.value)}
+          className="rounded-lg border border-slate-300 px-3 py-2"
+        >
+          {HOURS.map((h) => (
+            <option key={h} value={h}>
+              {h}
+            </option>
+          ))}
+        </select>
+        <select
+          value={minute}
+          onChange={(e) => setMinute(e.target.value)}
+          className="rounded-lg border border-slate-300 px-3 py-2"
+        >
+          {MINUTES.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+        </select>
+        <input
+          type="number"
+          min={5}
+          step={5}
+          value={durationMinutes}
+          onChange={(e) => setDurationMinutes(Number(e.target.value))}
+          className="w-24 rounded-lg border border-slate-300 px-3 py-2"
+        />
+        <span className="self-center text-sm text-slate-500">мин</span>
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={() => mutation.mutate()}
+          disabled={mutation.isPending}
+          className="rounded-lg bg-[var(--brand-primary)] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60"
+        >
+          Сохранить
+        </button>
+        <button onClick={onDone} className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600">
+          Отмена
+        </button>
+      </div>
+      {mutation.isError && <p className="text-sm text-red-600">Не удалось изменить занятие.</p>}
+    </div>
+  );
+}
+
+function LessonRow({
+  lesson,
+  canEdit,
+  isCardEnabled,
+  onChanged,
+  payMutation,
+}: {
+  lesson: IndividualLessonDto;
+  canEdit: boolean;
+  isCardEnabled: boolean;
+  onChanged: () => void;
+  payMutation: ReturnType<typeof useMutation<unknown, Error, { participantId: string; method: PaymentMethod }>>;
+}) {
+  const [editing, setEditing] = useState(false);
+
+  return (
+    <li className="space-y-2 px-4 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="font-medium text-slate-800">{formatDateTime(lesson.startAt)}</p>
+          <p className="text-sm text-slate-500">
+            {lesson.teacherName} · {lesson.durationMinutes} мин · {lesson.totalPrice}
+          </p>
+        </div>
+        {canEdit && !editing && (
+          <button onClick={() => setEditing(true)} className="text-sm font-medium text-[var(--brand-primary)]">
+            Изменить
+          </button>
+        )}
+      </div>
+
+      {editing && (
+        <EditLessonForm
+          lesson={lesson}
+          onDone={() => {
+            setEditing(false);
+            onChanged();
+          }}
+        />
+      )}
+
+      {!editing && (
+        <ul className="space-y-1">
+          {lesson.participants.map((p) => (
+            <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+              <span className="text-slate-700">
+                {p.studentName} — {p.shareAmount}
+              </span>
+              {p.isPaid ? (
+                <span className="text-emerald-600">Оплачено ({p.paymentMethod})</span>
+              ) : (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => payMutation.mutate({ participantId: p.id, method: PaymentMethod.CASH })}
+                    className="rounded-lg border border-slate-300 px-2 py-1 text-xs text-slate-600"
+                  >
+                    Наличные
+                  </button>
+                  {isCardEnabled && (
+                    <button
+                      onClick={() => payMutation.mutate({ participantId: p.id, method: PaymentMethod.CARD })}
+                      className="rounded-lg border border-slate-300 px-2 py-1 text-xs text-slate-600"
+                    >
+                      Карта
+                    </button>
+                  )}
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+}
+
 export default function IndividualLessonsPage() {
   const queryClient = useQueryClient();
+  const currentUser = useAuthStore((s) => s.user);
+  const isAdmin = currentUser?.role === Role.SUPER_ADMIN;
   const { data: lessons, isLoading } = useQuery({ queryKey: ["individual-lessons"], queryFn: getIndividualLessons });
   const { data: settings } = useQuery({ queryKey: ["tenant-settings"], queryFn: getTenantSettings });
 
@@ -214,45 +367,14 @@ export default function IndividualLessonsPage() {
       {isLoading && <p className="text-slate-500">Загрузка…</p>}
       <ul className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
         {lessons?.map((lesson) => (
-          <li key={lesson.id} className="space-y-2 px-4 py-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="font-medium text-slate-800">{formatDateTime(lesson.startAt)}</p>
-                <p className="text-sm text-slate-500">
-                  {lesson.teacherName} · {lesson.durationMinutes} мин · {lesson.totalPrice}
-                </p>
-              </div>
-            </div>
-            <ul className="space-y-1">
-              {lesson.participants.map((p) => (
-                <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                  <span className="text-slate-700">
-                    {p.studentName} — {p.shareAmount}
-                  </span>
-                  {p.isPaid ? (
-                    <span className="text-emerald-600">Оплачено ({p.paymentMethod})</span>
-                  ) : (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => payMutation.mutate({ participantId: p.id, method: PaymentMethod.CASH })}
-                        className="rounded-lg border border-slate-300 px-2 py-1 text-xs text-slate-600"
-                      >
-                        Наличные
-                      </button>
-                      {settings?.isCardEnabled && (
-                        <button
-                          onClick={() => payMutation.mutate({ participantId: p.id, method: PaymentMethod.CARD })}
-                          className="rounded-lg border border-slate-300 px-2 py-1 text-xs text-slate-600"
-                        >
-                          Карта
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </li>
+          <LessonRow
+            key={lesson.id}
+            lesson={lesson}
+            canEdit={isAdmin || lesson.teacherId === currentUser?.id}
+            isCardEnabled={!!settings?.isCardEnabled}
+            onChanged={invalidate}
+            payMutation={payMutation}
+          />
         ))}
         {lessons?.length === 0 && <li className="px-4 py-4 text-slate-500">Занятий пока нет</li>}
       </ul>

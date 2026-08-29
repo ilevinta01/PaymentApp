@@ -27,3 +27,11 @@ export async function markIndividualLessonParticipantPaid(participantId: string,
   const { data } = await apiClient.post(`/individual-lessons/participants/${participantId}/pay`, { paymentMethod });
   return data;
 }
+
+export async function updateIndividualLesson(
+  lessonId: string,
+  payload: { startAt?: string; durationMinutes?: number },
+): Promise<IndividualLessonDto> {
+  const { data } = await apiClient.patch<IndividualLessonDto>(`/individual-lessons/${lessonId}`, payload);
+  return data;
+}
