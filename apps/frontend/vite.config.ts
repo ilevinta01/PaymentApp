@@ -27,6 +27,13 @@ export default defineConfig({
         // index.html, дальше маршрутизацией занимается React Router на клиенте.
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/api\//],
+        // Без этого новый service worker "зависает" в состоянии waiting, пока все вкладки
+        // со старой версией не закроются вручную — из-за этого обновления не доходили
+        // до пользователей по несколько дней. skipWaiting+clientsClaim активируют новую
+        // версию сразу же, автообновление (registerType: autoUpdate) перезагружает вкладку.
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
       },
     }),
   ],
