@@ -15,6 +15,9 @@ function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString("ru-RU", { dateStyle: "medium", timeStyle: "short" });
 }
 
+const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
+const MINUTES = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, "0"));
+
 function CreateLessonForm({ onCreated }: { onCreated: () => void }) {
   const isAdmin = useAuthStore((s) => s.user?.role) === Role.SUPER_ADMIN;
   const { data: staff } = useQuery({ queryKey: ["staff"], queryFn: getStaff, enabled: isAdmin });
@@ -24,7 +27,8 @@ function CreateLessonForm({ onCreated }: { onCreated: () => void }) {
   const [studentQuery, setStudentQuery] = useState("");
   const [selectedStudents, setSelectedStudents] = useState<{ id: string; fullName: string }[]>([]);
   const [date, setDate] = useState("");
-  const [time, setTime] = useState("");
+  const [hour, setHour] = useState("");
+  const [minute, setMinute] = useState("");
   const [durationMinutes, setDurationMinutes] = useState(60);
 
   const trimmedQuery = studentQuery.trim();
@@ -39,7 +43,7 @@ function CreateLessonForm({ onCreated }: { onCreated: () => void }) {
       createIndividualLesson({
         teacherId: isAdmin ? teacherId : undefined,
         studentIds: selectedStudents.map((s) => s.id),
-        startAt: new Date(`${date}T${time}`).toISOString(),
+        startAt: new Date(`${date}T${hour}:${minute}`).toISOString(),
         durationMinutes,
       }),
     onSuccess: () => {
@@ -47,7 +51,8 @@ function CreateLessonForm({ onCreated }: { onCreated: () => void }) {
       setTeacherId("");
       setSelectedStudents([]);
       setDate("");
-      setTime("");
+      setHour("");
+      setMinute("");
       setDurationMinutes(60);
     },
   });
@@ -130,13 +135,36 @@ function CreateLessonForm({ onCreated }: { onCreated: () => void }) {
           required
           className="flex-1 rounded-lg border border-slate-300 px-3 py-2"
         />
-        <input
-          type="time"
-          value={time}
-          onChange={(e) => setTime(e.target.value)}
+        <select
+          value={hour}
+          onChange={(e) => setHour(e.target.value)}
           required
-          className="flex-1 rounded-lg border border-slate-300 px-3 py-2"
-        />
+          className="rounded-lg border border-slate-300 px-3 py-2"
+        >
+          <option value="" disabled>
+            Час
+          </option>
+          {HOURS.map((h) => (
+            <option key={h} value={h}>
+              {h}
+            </option>
+          ))}
+        </select>
+        <select
+          value={minute}
+          onChange={(e) => setMinute(e.target.value)}
+          required
+          className="rounded-lg border border-slate-300 px-3 py-2"
+        >
+          <option value="" disabled>
+            Мин
+          </option>
+          {MINUTES.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+        </select>
         <input
           type="number"
           min={5}
