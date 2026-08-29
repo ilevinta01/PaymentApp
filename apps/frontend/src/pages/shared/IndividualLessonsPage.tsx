@@ -23,7 +23,8 @@ function CreateLessonForm({ onCreated }: { onCreated: () => void }) {
   const [teacherId, setTeacherId] = useState("");
   const [studentQuery, setStudentQuery] = useState("");
   const [selectedStudents, setSelectedStudents] = useState<{ id: string; fullName: string }[]>([]);
-  const [startAt, setStartAt] = useState("");
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
   const [durationMinutes, setDurationMinutes] = useState(60);
 
   const trimmedQuery = studentQuery.trim();
@@ -38,14 +39,15 @@ function CreateLessonForm({ onCreated }: { onCreated: () => void }) {
       createIndividualLesson({
         teacherId: isAdmin ? teacherId : undefined,
         studentIds: selectedStudents.map((s) => s.id),
-        startAt: new Date(startAt).toISOString(),
+        startAt: new Date(`${date}T${time}`).toISOString(),
         durationMinutes,
       }),
     onSuccess: () => {
       onCreated();
       setTeacherId("");
       setSelectedStudents([]);
-      setStartAt("");
+      setDate("");
+      setTime("");
       setDurationMinutes(60);
     },
   });
@@ -122,9 +124,16 @@ function CreateLessonForm({ onCreated }: { onCreated: () => void }) {
 
       <div className="flex flex-wrap gap-2">
         <input
-          type="datetime-local"
-          value={startAt}
-          onChange={(e) => setStartAt(e.target.value)}
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          required
+          className="flex-1 rounded-lg border border-slate-300 px-3 py-2"
+        />
+        <input
+          type="time"
+          value={time}
+          onChange={(e) => setTime(e.target.value)}
           required
           className="flex-1 rounded-lg border border-slate-300 px-3 py-2"
         />
