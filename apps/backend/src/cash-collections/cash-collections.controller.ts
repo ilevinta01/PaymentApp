@@ -2,10 +2,12 @@ import { Body, Controller, Get, Post } from "@nestjs/common";
 import { JwtPayload, Role } from "@oplata/shared";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
+import { RequireFeature } from "../tenants/decorators/require-feature.decorator";
 import { CashCollectionsService } from "./cash-collections.service";
 import { CreateCashCollectionDto } from "./dto/create-cash-collection.dto";
 
 @Roles(Role.SUPER_ADMIN)
+@RequireFeature("isCashCollectionEnabled")
 @Controller("cash-collections")
 export class CashCollectionsController {
   constructor(private readonly service: CashCollectionsService) {}

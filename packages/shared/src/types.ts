@@ -20,6 +20,9 @@ export interface AuthResponse {
 
 export interface TenantSettingsDto {
   isCardEnabled: boolean;
+  isTelegramEnabled: boolean;
+  isCashCollectionEnabled: boolean;
+  isTeacherEarningsEnabled: boolean;
   telegramBotToken: string | null;
   primaryColor: string | null;
   logoUrl: string | null;
@@ -103,6 +106,10 @@ export interface TenantSummaryDto {
   contractUploadedAt: string | null;
   primaryColor: string | null;
   logoUrl: string | null;
+  isCardEnabled: boolean;
+  isTelegramEnabled: boolean;
+  isCashCollectionEnabled: boolean;
+  isTeacherEarningsEnabled: boolean;
   owner: { fullName: string; email: string; phone: string | null } | null;
 }
 

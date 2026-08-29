@@ -7,12 +7,20 @@ import {
   getTenants,
   updateSubscription,
   updateTenantBranding,
+  updateTenantFeatures,
   uploadContract,
   uploadTenantLogo,
 } from "../../api/platform";
 import { clearPlatformKey, getPlatformKey, setPlatformKey } from "../../api/platformClient";
 
 const DEFAULT_COLOR = "#4f46e5";
+
+const FEATURE_LIST: { key: "isCardEnabled" | "isTelegramEnabled" | "isCashCollectionEnabled" | "isTeacherEarningsEnabled"; label: string }[] = [
+  { key: "isCardEnabled", label: "Оплата картой" },
+  { key: "isTelegramEnabled", label: "Telegram-чеки" },
+  { key: "isCashCollectionEnabled", label: "Касса (инкассация)" },
+  { key: "isTeacherEarningsEnabled", label: "Отчёт по заработку" },
+];
 
 function TenantRow({ tenant, onChanged }: { tenant: TenantSummaryDto; onChanged: () => void }) {
   const [paidUntil, setPaidUntil] = useState(tenant.subscriptionPaidUntil.slice(0, 10));
@@ -32,6 +40,11 @@ function TenantRow({ tenant, onChanged }: { tenant: TenantSummaryDto; onChanged:
 
   const logoMutation = useMutation({
     mutationFn: (file: File) => uploadTenantLogo(tenant.id, file),
+    onSuccess: onChanged,
+  });
+
+  const featuresMutation = useMutation({
+    mutationFn: (key: (typeof FEATURE_LIST)[number]["key"]) => updateTenantFeatures(tenant.id, { [key]: !tenant[key] }),
     onSuccess: onChanged,
   });
 
@@ -177,6 +190,22 @@ function TenantRow({ tenant, onChanged }: { tenant: TenantSummaryDto; onChanged:
             {logoMutation.isPending ? "Загружаем…" : "Загрузить логотип"}
           </button>
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 rounded-lg bg-slate-50 px-3 py-2">
+        <span className="text-sm text-slate-600">Тариф (подключённые функции):</span>
+        {FEATURE_LIST.map((feature) => (
+          <label key={feature.key} className="flex items-center gap-1.5 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={tenant[feature.key]}
+              onChange={() => featuresMutation.mutate(feature.key)}
+              disabled={featuresMutation.isPending}
+              className="h-4 w-4"
+            />
+            {feature.label}
+          </label>
+        ))}
       </div>
     </li>
   );

@@ -16,6 +16,9 @@ export class TenantSettingsService {
       settings ?? {
         tenantId,
         isCardEnabled: false,
+        isTelegramEnabled: false,
+        isCashCollectionEnabled: false,
+        isTeacherEarningsEnabled: false,
         telegramBotToken: null,
         primaryColor: null,
         logoUrl: null,

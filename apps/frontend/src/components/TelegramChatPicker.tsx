@@ -1,17 +1,20 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getTelegramChats } from "../api/tenantSettings";
+import { getTelegramChats, getTenantSettings } from "../api/tenantSettings";
 
 // Помогает найти numeric chat_id родителя без ручного копания в Telegram API:
 // показывает тех, кто недавно написал что-то боту центра, и даёт выбрать одним кликом.
 export default function TelegramChatPicker({ onSelect }: { onSelect: (chatId: string) => void }) {
   const [open, setOpen] = useState(false);
+  const { data: settings } = useQuery({ queryKey: ["tenant-settings"], queryFn: getTenantSettings });
   const { data: chats, isFetching, isError, refetch } = useQuery({
     queryKey: ["telegram-chats"],
     queryFn: getTelegramChats,
     enabled: false,
     retry: false,
   });
+
+  if (!settings?.isTelegramEnabled) return null;
 
   return (
     <div className="space-y-2">

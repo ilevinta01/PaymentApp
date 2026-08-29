@@ -20,6 +20,7 @@ import { diskStorage, memoryStorage } from "multer";
 import { Public } from "../auth/decorators/public.decorator";
 import { CreateTenantDto } from "./dto/create-tenant.dto";
 import { UpdateBrandingDto } from "./dto/update-branding.dto";
+import { UpdateFeaturesDto } from "./dto/update-features.dto";
 import { UpdateSubscriptionDto } from "./dto/update-subscription.dto";
 import { PlatformAdminGuard } from "./guards/platform-admin.guard";
 import { PlatformService } from "./platform.service";
@@ -88,5 +89,10 @@ export class PlatformController {
     }
     const dataUrl = `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
     return this.service.saveLogo(id, dataUrl);
+  }
+
+  @Patch(":id/features")
+  updateFeatures(@Param("id") id: string, @Body() dto: UpdateFeaturesDto) {
+    return this.service.updateFeatures(id, dto);
   }
 }

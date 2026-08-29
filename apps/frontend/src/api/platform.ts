@@ -48,6 +48,19 @@ export async function uploadTenantLogo(tenantId: string, file: File) {
   return data;
 }
 
+export async function updateTenantFeatures(
+  tenantId: string,
+  features: Partial<{
+    isCardEnabled: boolean;
+    isTelegramEnabled: boolean;
+    isCashCollectionEnabled: boolean;
+    isTeacherEarningsEnabled: boolean;
+  }>,
+) {
+  const { data } = await platformClient.patch(`/platform/tenants/${tenantId}/features`, features);
+  return data;
+}
+
 // Скачивание требует заголовок x-platform-key, поэтому обычная <a href> ссылка не подходит —
 // грузим файл через тот же авторизованный клиент и открываем как Blob.
 export async function downloadContract(tenantId: string, tenantName: string): Promise<void> {

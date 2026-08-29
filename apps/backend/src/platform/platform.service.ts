@@ -3,6 +3,7 @@ import * as bcrypt from "bcrypt";
 import { Role, SubscriptionStatus } from "@oplata/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateTenantDto } from "./dto/create-tenant.dto";
+import { UpdateFeaturesDto } from "./dto/update-features.dto";
 import { UpdateSubscriptionDto } from "./dto/update-subscription.dto";
 
 @Injectable()
@@ -12,7 +13,16 @@ export class PlatformService {
   async listTenants() {
     const tenants = await this.prisma.tenant.findMany({
       include: {
-        settings: { select: { primaryColor: true, logoUrl: true } },
+        settings: {
+          select: {
+            primaryColor: true,
+            logoUrl: true,
+            isCardEnabled: true,
+            isTelegramEnabled: true,
+            isCashCollectionEnabled: true,
+            isTeacherEarningsEnabled: true,
+          },
+        },
         _count: { select: { users: true, students: true } },
         users: {
           where: { role: Role.SUPER_ADMIN },
@@ -36,6 +46,10 @@ export class PlatformService {
       contractUploadedAt: tenant.contractUploadedAt,
       primaryColor: tenant.settings?.primaryColor ?? null,
       logoUrl: tenant.settings?.logoUrl ?? null,
+      isCardEnabled: tenant.settings?.isCardEnabled ?? false,
+      isTelegramEnabled: tenant.settings?.isTelegramEnabled ?? false,
+      isCashCollectionEnabled: tenant.settings?.isCashCollectionEnabled ?? false,
+      isTeacherEarningsEnabled: tenant.settings?.isTeacherEarningsEnabled ?? false,
       owner: tenant.users[0] ?? null,
     }));
   }
@@ -108,6 +122,14 @@ export class PlatformService {
       where: { tenantId },
       create: { tenantId, logoUrl },
       update: { logoUrl },
+    });
+  }
+
+  updateFeatures(tenantId: string, dto: UpdateFeaturesDto) {
+    return this.prisma.tenantSettings.upsert({
+      where: { tenantId },
+      create: { tenantId, ...dto },
+      update: dto,
     });
   }
 }

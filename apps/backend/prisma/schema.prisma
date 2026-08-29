@@ -49,12 +49,15 @@ model Tenant {
 }
 
 model TenantSettings {
-  tenantId         String  @id
-  tenant           Tenant  @relation(fields: [tenantId], references: [id])
-  isCardEnabled    Boolean @default(false)
-  telegramBotToken String?
-  primaryColor     String?
-  logoUrl          String?
+  tenantId                 String  @id
+  tenant                   Tenant  @relation(fields: [tenantId], references: [id])
+  isCardEnabled            Boolean @default(false)
+  isTelegramEnabled        Boolean @default(false)
+  isCashCollectionEnabled  Boolean @default(false)
+  isTeacherEarningsEnabled Boolean @default(false)
+  telegramBotToken         String?
+  primaryColor             String?
+  logoUrl                  String?
 }
 
 // email уникален глобально по платформе (не в рамках тенанта), т.к. на экране логина

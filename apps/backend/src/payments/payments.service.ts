@@ -71,7 +71,7 @@ export class PaymentsService {
       include: WITH_STUDENT,
     });
 
-    if (settings?.telegramBotToken && student.parentTelegramChatId) {
+    if (settings?.isTelegramEnabled && settings?.telegramBotToken && student.parentTelegramChatId) {
       const text = [
         "Оплата получена",
         `Ученик: ${student.fullName}`,

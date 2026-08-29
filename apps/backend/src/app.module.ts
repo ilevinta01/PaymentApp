@@ -7,6 +7,7 @@ import { AuthModule } from "./auth/auth.module";
 import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard";
 import { SubscriptionGuard } from "./auth/guards/subscription.guard";
 import { RolesGuard } from "./auth/guards/roles.guard";
+import { TenantFeatureGuard } from "./tenants/guards/tenant-feature.guard";
 import { TenantSettingsModule } from "./tenants/tenant-settings.module";
 import { UsersModule } from "./users/users.module";
 import { GroupsModule } from "./groups/groups.module";
@@ -43,6 +44,7 @@ import { HealthModule } from "./health/health.module";
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: SubscriptionGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_GUARD, useClass: TenantFeatureGuard },
   ],
 })
 export class AppModule {}

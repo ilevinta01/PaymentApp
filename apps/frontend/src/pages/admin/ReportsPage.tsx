@@ -2,14 +2,15 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { getReportSummary } from "../../api/reports";
+import { getTenantSettings } from "../../api/tenantSettings";
 import { getLastMonths } from "../../utils/months";
 
 const LINKS = [
   { to: "/admin/reports/payments", label: "Оплаты (список и редактирование)" },
   { to: "/admin/reports/debtors", label: "Должники" },
   { to: "/admin/reports/payment-logs", label: "Реестр изменений" },
-  { to: "/admin/reports/teacher-earnings", label: "По преподавателям" },
-  { to: "/admin/reports/cash-collections", label: "Касса (инкассация)" },
+  { to: "/admin/reports/teacher-earnings", label: "По преподавателям", feature: "isTeacherEarningsEnabled" as const },
+  { to: "/admin/reports/cash-collections", label: "Касса (инкассация)", feature: "isCashCollectionEnabled" as const },
 ];
 
 export default function ReportsPage() {
@@ -19,6 +20,9 @@ export default function ReportsPage() {
     queryKey: ["reports-summary", periodMonth],
     queryFn: () => getReportSummary(periodMonth),
   });
+  const { data: settings } = useQuery({ queryKey: ["tenant-settings"], queryFn: getTenantSettings });
+
+  const links = LINKS.filter((link) => !link.feature || settings?.[link.feature]);
 
   const stats = data
     ? [
@@ -61,7 +65,7 @@ export default function ReportsPage() {
       )}
 
       <ul className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
-        {LINKS.map((link) => (
+        {links.map((link) => (
           <li key={link.to}>
             <Link to={link.to} className="block px-4 py-4 text-slate-800 active:bg-slate-50">
               {link.label}
