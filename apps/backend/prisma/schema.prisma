@@ -111,10 +111,25 @@ model Group {
 
   // Группу может вести несколько преподавателей одновременно; Супер-Админ
   // имеет доступ ко всем группам тенанта независимо от этой связи.
-  teachers User[]    @relation("GroupTeachers")
-  students Student[]
+  teachers      User[]              @relation("GroupTeachers")
+  students      Student[]
+  scheduleSlots GroupScheduleSlot[]
 
   @@index([tenantId])
+}
+
+// Еженедельно повторяющийся слот занятия группы (например, "Пн 15:00-16:00").
+// dayOfWeek: 0 = воскресенье .. 6 = суббота (как Date.getDay() в JS).
+// startMinutes/endMinutes — минуты от полуночи, чтобы легко сравнивать пересечения.
+model GroupScheduleSlot {
+  id           String @id @default(uuid())
+  groupId      String
+  group        Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  dayOfWeek    Int
+  startMinutes Int
+  endMinutes   Int
+
+  @@index([groupId])
 }
 
 model Student {

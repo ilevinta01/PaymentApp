@@ -12,6 +12,7 @@ import GroupDetailPage from "./pages/shared/GroupDetailPage";
 import StudentDetailPage from "./pages/shared/StudentDetailPage";
 import SearchStudentPage from "./pages/shared/SearchStudentPage";
 import IndividualLessonsPage from "./pages/shared/IndividualLessonsPage";
+import SchedulePage from "./pages/shared/SchedulePage";
 import AddStudentPage from "./pages/admin/AddStudentPage";
 import ReportsPage from "./pages/admin/ReportsPage";
 import TeacherEarningsPage from "./pages/admin/TeacherEarningsPage";
@@ -42,6 +43,7 @@ export default function App() {
             <Route path="students/:studentId" element={<StudentDetailPage />} />
             <Route path="search" element={<SearchStudentPage />} />
             <Route path="individual-lessons" element={<IndividualLessonsPage />} />
+            <Route path="schedule" element={<SchedulePage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="reports/payments" element={<PaymentsPage />} />
             <Route path="reports/debtors" element={<DebtorsPage />} />
@@ -61,6 +63,7 @@ export default function App() {
             <Route path="students/:studentId" element={<StudentDetailPage />} />
             <Route path="search" element={<SearchStudentPage />} />
             <Route path="individual-lessons" element={<IndividualLessonsPage />} />
+            <Route path="schedule" element={<SchedulePage />} />
           </Route>
         </Route>
 

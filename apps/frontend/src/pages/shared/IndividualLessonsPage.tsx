@@ -16,6 +16,14 @@ function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString("ru-RU", { dateStyle: "medium", timeStyle: "short" });
 }
 
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error && typeof error === "object" && "response" in error) {
+    const message = (error as { response?: { data?: { message?: string } } }).response?.data?.message;
+    if (typeof message === "string") return message;
+  }
+  return fallback;
+}
+
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
 const MINUTES = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, "0"));
 
@@ -189,7 +197,9 @@ function CreateLessonForm({ onCreated }: { onCreated: () => void }) {
       >
         {mutation.isPending ? "Создаём…" : "Создать занятие"}
       </button>
-      {mutation.isError && <p className="text-sm text-red-600">Не удалось создать занятие.</p>}
+      {mutation.isError && (
+        <p className="text-sm text-red-600">{getErrorMessage(mutation.error, "Не удалось создать занятие.")}</p>
+      )}
     </form>
   );
 }
@@ -263,7 +273,9 @@ function EditLessonForm({ lesson, onDone }: { lesson: IndividualLessonDto; onDon
           Отмена
         </button>
       </div>
-      {mutation.isError && <p className="text-sm text-red-600">Не удалось изменить занятие.</p>}
+      {mutation.isError && (
+        <p className="text-sm text-red-600">{getErrorMessage(mutation.error, "Не удалось изменить занятие.")}</p>
+      )}
     </div>
   );
 }

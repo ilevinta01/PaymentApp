@@ -3,6 +3,7 @@ import { JwtPayload, Role } from "@oplata/shared";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { CreateGroupDto } from "./dto/create-group.dto";
+import { CreateScheduleSlotDto } from "./dto/create-schedule-slot.dto";
 import { GroupsService } from "./groups.service";
 
 @Controller("groups")
@@ -30,5 +31,17 @@ export class GroupsController {
   @Delete(":id")
   remove(@CurrentUser() user: JwtPayload, @Param("id") id: string) {
     return this.service.remove(user.tenantId, id);
+  }
+
+  @Roles(Role.SUPER_ADMIN)
+  @Post(":id/schedule-slots")
+  addScheduleSlot(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Body() dto: CreateScheduleSlotDto) {
+    return this.service.addScheduleSlot(user.tenantId, id, dto);
+  }
+
+  @Roles(Role.SUPER_ADMIN)
+  @Delete("schedule-slots/:slotId")
+  removeScheduleSlot(@CurrentUser() user: JwtPayload, @Param("slotId") slotId: string) {
+    return this.service.removeScheduleSlot(user.tenantId, slotId);
   }
 }

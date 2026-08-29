@@ -15,3 +15,13 @@ export async function updateGroup(id: string, payload: { name?: string; monthlyP
   const { data } = await apiClient.patch<GroupDto>(`/groups/${id}`, payload);
   return data;
 }
+
+export async function addScheduleSlot(groupId: string, payload: { dayOfWeek: number; startTime: string; endTime: string }) {
+  const { data } = await apiClient.post(`/groups/${groupId}/schedule-slots`, payload);
+  return data;
+}
+
+export async function removeScheduleSlot(slotId: string) {
+  const { data } = await apiClient.delete(`/groups/schedule-slots/${slotId}`);
+  return data;
+}

@@ -36,10 +36,33 @@ export interface TelegramChatOptionDto {
   lastMessage: string | null;
 }
 
+export interface GroupScheduleSlotDto {
+  id: string;
+  groupId: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+}
+
 export interface GroupDto {
   id: string;
   name: string;
   monthlyPrice: string;
+  scheduleSlots?: GroupScheduleSlotDto[];
+}
+
+export interface ScheduleGroupOccurrenceDto {
+  groupId: string;
+  groupName: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+}
+
+export interface WeeklyScheduleDto {
+  weekStart: string;
+  groupOccurrences: ScheduleGroupOccurrenceDto[];
+  individualLessons: IndividualLessonDto[];
 }
 
 export interface StudentDto {

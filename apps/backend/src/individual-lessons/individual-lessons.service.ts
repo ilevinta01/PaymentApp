@@ -1,4 +1,10 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { JwtPayload, PaymentMethod, Role } from "@oplata/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import { TelegramService } from "../telegram/telegram.service";
@@ -6,7 +12,7 @@ import { CreateIndividualLessonDto } from "./dto/create-individual-lesson.dto";
 import { MarkParticipantPaidDto } from "./dto/mark-participant-paid.dto";
 import { UpdateIndividualLessonDto } from "./dto/update-individual-lesson.dto";
 
-const WITH_DETAILS = {
+export const WITH_DETAILS = {
   teacher: { select: { id: true, fullName: true } },
   participants: { include: { student: { select: { id: true, fullName: true } } } },
 } as const;
@@ -20,7 +26,7 @@ function splitEvenly(total: number, count: number): number[] {
 
 // Prisma include-запросы возвращают вложенные объекты (teacher.fullName, participant.student.fullName),
 // а фронтенд ждёт плоские поля teacherName/studentName — приводим форму здесь, в одном месте.
-function mapLesson(lesson: {
+export function mapLesson(lesson: {
   id: string;
   teacherId: string;
   teacher: { fullName: string };
@@ -131,6 +137,8 @@ export class IndividualLessonsService {
       throw new BadRequestException("Некоторые ученики не найдены");
     }
 
+    await this.assertNoConflict(tenantId, teacherId, new Date(dto.startAt), dto.durationMinutes);
+
     const hourlyRate = Number(teacher.individualLessonRate);
     const totalPrice = Math.round(hourlyRate * (dto.durationMinutes / 60) * 100) / 100;
     const shares = splitEvenly(totalPrice, uniqueStudentIds.length);
@@ -166,6 +174,10 @@ export class IndividualLessonsService {
 
     const newStartAt = dto.startAt ? new Date(dto.startAt) : lesson.startAt;
     const newDuration = dto.durationMinutes ?? lesson.durationMinutes;
+
+    if (dto.startAt !== undefined || dto.durationMinutes !== undefined) {
+      await this.assertNoConflict(tenantId, lesson.teacherId, newStartAt, newDuration, lessonId);
+    }
 
     let newTotalPrice = Number(lesson.totalPrice);
     const shareUpdates: { id: string; shareAmount: number }[] = [];
@@ -240,6 +252,53 @@ export class IndividualLessonsService {
     }
 
     return updated;
+  }
+
+  // Запрещает пересечение нового/изменённого индивидуального занятия с расписанием групп
+  // этого преподавателя и с его другими индивидуальными занятиями в тот же день.
+  private async assertNoConflict(
+    tenantId: string,
+    teacherId: string,
+    startAt: Date,
+    durationMinutes: number,
+    excludeLessonId?: string,
+  ) {
+    const dayOfWeek = startAt.getDay();
+    const startMinutes = startAt.getHours() * 60 + startAt.getMinutes();
+    const endMinutes = startMinutes + durationMinutes;
+
+    const groupSlots = await this.prisma.groupScheduleSlot.findMany({
+      where: { dayOfWeek, group: { tenantId, teachers: { some: { id: teacherId } } } },
+      include: { group: { select: { name: true } } },
+    });
+    const groupConflict = groupSlots.find((s) => s.startMinutes < endMinutes && startMinutes < s.endMinutes);
+    if (groupConflict) {
+      throw new ConflictException(`Пересечение с расписанием группы «${groupConflict.group.name}»`);
+    }
+
+    const dayStart = new Date(startAt);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setDate(dayEnd.getDate() + 1);
+
+    const otherLessons = await this.prisma.individualLesson.findMany({
+      where: {
+        tenantId,
+        teacherId,
+        startAt: { gte: dayStart, lt: dayEnd },
+        ...(excludeLessonId ? { id: { not: excludeLessonId } } : {}),
+      },
+    });
+    const newEnd = new Date(startAt.getTime() + durationMinutes * 60000);
+    const lessonConflict = otherLessons.find((l) => {
+      const existingEnd = new Date(l.startAt.getTime() + l.durationMinutes * 60000);
+      return l.startAt < newEnd && startAt < existingEnd;
+    });
+    if (lessonConflict) {
+      throw new ConflictException(
+        `Пересечение с другим индивидуальным занятием (${formatDateTime(lessonConflict.startAt)})`,
+      );
+    }
   }
 
   private async sendNotifications(

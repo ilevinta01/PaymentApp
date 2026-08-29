@@ -15,9 +15,10 @@ export default function HomePage() {
         <BigButton to="/teacher/groups" label="Группы" />
         <BigButton to="/teacher/search" label="Поиск ученика" />
         {settings?.isIndividualLessonsEnabled && (
-          <div className="col-span-2">
+          <>
             <BigButton to="/teacher/individual-lessons" label="Индивидуальные занятия" />
-          </div>
+            <BigButton to="/teacher/schedule" label="Расписание" />
+          </>
         )}
       </div>
     </div>
