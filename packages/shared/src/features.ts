@@ -1,4 +1,9 @@
-export type FeatureKey = "isCardEnabled" | "isTelegramEnabled" | "isCashCollectionEnabled" | "isTeacherEarningsEnabled";
+export type FeatureKey =
+  | "isCardEnabled"
+  | "isTelegramEnabled"
+  | "isCashCollectionEnabled"
+  | "isTeacherEarningsEnabled"
+  | "isIndividualLessonsEnabled";
 
 export interface FeatureDefinition {
   key: FeatureKey;
@@ -28,6 +33,12 @@ export const FEATURE_DEFINITIONS: FeatureDefinition[] = [
     key: "isTeacherEarningsEnabled",
     label: "Отчёт по заработку преподавателей",
     description: "Отчёт о том, кто из преподавателей собрал сколько денег и когда.",
+  },
+  {
+    key: "isIndividualLessonsEnabled",
+    label: "Индивидуальные занятия",
+    description:
+      "Создание индивидуальных занятий на одного или нескольких учеников с уведомлением учителя и родителей и раздельным учётом оплаты.",
   },
 ];
 

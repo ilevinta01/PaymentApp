@@ -16,4 +16,8 @@ export class UpdateFeaturesDto {
   @IsOptional()
   @IsBoolean()
   isTeacherEarningsEnabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isIndividualLessonsEnabled?: boolean;
 }

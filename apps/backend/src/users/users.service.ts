@@ -11,6 +11,8 @@ const SAFE_SELECT = {
   phone: true,
   role: true,
   isActive: true,
+  individualLessonRate: true,
+  telegramChatId: true,
   groupsTaught: { select: { id: true } },
 } as const;
 
@@ -21,6 +23,8 @@ type RawUser = {
   phone: string | null;
   role: string;
   isActive: boolean;
+  individualLessonRate: unknown;
+  telegramChatId: string | null;
   groupsTaught: { id: string }[];
 };
 
@@ -80,6 +84,8 @@ export class UsersService {
       data: {
         ...(dto.fullName !== undefined ? { fullName: dto.fullName } : {}),
         ...(dto.phone !== undefined ? { phone: dto.phone } : {}),
+        ...(dto.individualLessonRate !== undefined ? { individualLessonRate: dto.individualLessonRate } : {}),
+        ...(dto.telegramChatId !== undefined ? { telegramChatId: dto.telegramChatId } : {}),
         // "set" полностью заменяет набор групп этого преподавателя, не трогая
         // назначения других преподавателей на те же группы (связь многие-ко-многим).
         ...(dto.groupIds !== undefined ? { groupsTaught: { set: dto.groupIds.map((id) => ({ id })) } } : {}),

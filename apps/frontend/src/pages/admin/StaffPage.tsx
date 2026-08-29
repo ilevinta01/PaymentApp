@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { GroupDto, Role, UserDto } from "@oplata/shared";
 import { createStaff, getStaff, setStaffActive, updateStaff } from "../../api/users";
 import { getGroups } from "../../api/groups";
+import { getTenantSettings } from "../../api/tenantSettings";
+import TelegramChatPicker from "../../components/TelegramChatPicker";
 
 function GroupCheckboxes({
   groups,
@@ -45,14 +47,17 @@ function GroupCheckboxes({
 function StaffRow({
   member,
   groups,
+  showIndividualLessonRate,
   onChanged,
 }: {
   member: UserDto;
   groups: GroupDto[];
+  showIndividualLessonRate: boolean;
   onChanged: () => void;
 }) {
   const [editingGroups, setEditingGroups] = useState(false);
   const [groupIds, setGroupIds] = useState<string[]>(member.groupIds ?? []);
+  const [rate, setRate] = useState(member.individualLessonRate ?? "");
 
   const groupsMutation = useMutation({
     mutationFn: () => updateStaff(member.id, { groupIds }),
@@ -64,6 +69,16 @@ function StaffRow({
 
   const activeMutation = useMutation({
     mutationFn: () => setStaffActive(member.id, !member.isActive),
+    onSuccess: onChanged,
+  });
+
+  const rateMutation = useMutation({
+    mutationFn: () => updateStaff(member.id, { individualLessonRate: Number(rate) }),
+    onSuccess: onChanged,
+  });
+
+  const telegramMutation = useMutation({
+    mutationFn: (telegramChatId: string) => updateStaff(member.id, { telegramChatId }),
     onSuccess: onChanged,
   });
 
@@ -127,6 +142,32 @@ function StaffRow({
               </div>
             </div>
           )}
+
+          {showIndividualLessonRate && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 p-3">
+              <label className="text-sm text-slate-600">Ставка за индивидуальное (в час):</label>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={rate}
+                onChange={(e) => setRate(e.target.value)}
+                className="w-28 rounded-lg border border-slate-300 px-2 py-1 text-sm"
+              />
+              <button
+                onClick={() => rateMutation.mutate()}
+                disabled={rateMutation.isPending}
+                className="rounded-lg bg-[var(--brand-primary)] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60"
+              >
+                Сохранить
+              </button>
+              {member.telegramChatId ? (
+                <span className="text-sm text-emerald-600">Telegram привязан</span>
+              ) : (
+                <TelegramChatPicker onSelect={(chatId) => telegramMutation.mutate(chatId)} />
+              )}
+            </div>
+          )}
         </div>
       )}
     </li>
@@ -137,6 +178,7 @@ export default function StaffPage() {
   const queryClient = useQueryClient();
   const { data: staff } = useQuery({ queryKey: ["staff"], queryFn: getStaff });
   const { data: groups } = useQuery({ queryKey: ["groups"], queryFn: getGroups });
+  const { data: settings } = useQuery({ queryKey: ["tenant-settings"], queryFn: getTenantSettings });
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -230,7 +272,13 @@ export default function StaffPage() {
 
       <ul className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
         {staff?.map((member) => (
-          <StaffRow key={member.id} member={member} groups={groups ?? []} onChanged={invalidateStaff} />
+          <StaffRow
+            key={member.id}
+            member={member}
+            groups={groups ?? []}
+            showIndividualLessonRate={!!settings?.isIndividualLessonsEnabled}
+            onChanged={invalidateStaff}
+          />
         ))}
         {staff?.length === 0 && <li className="px-4 py-4 text-slate-500">Сотрудников пока нет</li>}
       </ul>

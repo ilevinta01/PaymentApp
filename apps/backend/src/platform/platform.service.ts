@@ -30,6 +30,7 @@ export class PlatformService {
             isTelegramEnabled: true,
             isCashCollectionEnabled: true,
             isTeacherEarningsEnabled: true,
+            isIndividualLessonsEnabled: true,
           },
         },
         _count: { select: { users: true, students: true } },
@@ -60,6 +61,7 @@ export class PlatformService {
       isTelegramEnabled: tenant.settings?.isTelegramEnabled ?? false,
       isCashCollectionEnabled: tenant.settings?.isCashCollectionEnabled ?? false,
       isTeacherEarningsEnabled: tenant.settings?.isTeacherEarningsEnabled ?? false,
+      isIndividualLessonsEnabled: tenant.settings?.isIndividualLessonsEnabled ?? false,
       owner: tenant.users[0] ?? null,
     }));
   }

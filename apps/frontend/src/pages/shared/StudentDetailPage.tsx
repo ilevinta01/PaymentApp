@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PaymentMethod, Role, StudentStatus } from "@oplata/shared";
 import { getStudent, updateStudent, updateStudentStatus } from "../../api/students";
 import { createPayment } from "../../api/payments";
+import { getIndividualLessonsForStudent } from "../../api/individualLessons";
 import { getTenantSettings } from "../../api/tenantSettings";
 import { useAuthStore } from "../../store/auth.store";
 import TelegramChatPicker from "../../components/TelegramChatPicker";
@@ -31,6 +32,11 @@ export default function StudentDetailPage() {
     enabled: !!studentId,
   });
   const { data: settings } = useQuery({ queryKey: ["tenant-settings"], queryFn: getTenantSettings });
+  const { data: individualLessons } = useQuery({
+    queryKey: ["individual-lessons-for-student", studentId],
+    queryFn: () => getIndividualLessonsForStudent(studentId!),
+    enabled: !!studentId && !!settings?.isIndividualLessonsEnabled,
+  });
 
   const invalidateStudent = () => {
     queryClient.invalidateQueries({ queryKey: ["student", studentId] });
@@ -267,6 +273,29 @@ export default function StudentDetailPage() {
           </form>
         )}
       </div>
+
+      {settings?.isIndividualLessonsEnabled && (
+        <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+          <h3 className="font-semibold text-slate-900">Индивидуальные занятия</h3>
+          <ul className="divide-y divide-slate-200">
+            {individualLessons?.map((p) => (
+              <li key={p.id} className="flex items-center justify-between gap-2 py-2 text-sm">
+                <div>
+                  <p className="text-slate-800">
+                    {new Date(p.individualLesson.startAt).toLocaleDateString("ru-RU")} ·{" "}
+                    {p.individualLesson.teacherName}
+                  </p>
+                  <p className="text-slate-500">Доля: {p.shareAmount}</p>
+                </div>
+                <span className={p.isPaid ? "text-emerald-600" : "text-red-600"}>
+                  {p.isPaid ? "Оплачено" : "Не оплачено"}
+                </span>
+              </li>
+            ))}
+            {individualLessons?.length === 0 && <li className="py-2 text-slate-500">Занятий пока не было</li>}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

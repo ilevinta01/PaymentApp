@@ -43,9 +43,10 @@ model Tenant {
   users           User[]
   groups          Group[]
   students        Student[]
-  payments        Payment[]
-  paymentLogs     PaymentLog[]
-  cashCollections CashCollection[]
+  payments          Payment[]
+  paymentLogs       PaymentLog[]
+  cashCollections   CashCollection[]
+  individualLessons IndividualLesson[]
 }
 
 model TenantSettings {
@@ -55,6 +56,7 @@ model TenantSettings {
   isTelegramEnabled        Boolean @default(false)
   isCashCollectionEnabled  Boolean @default(false)
   isTeacherEarningsEnabled Boolean @default(false)
+  isIndividualLessonsEnabled Boolean @default(false)
   telegramBotToken         String?
   primaryColor             String?
   logoUrl                  String?
@@ -81,11 +83,20 @@ model User {
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
 
-  groupsTaught         Group[]          @relation("GroupTeachers")
-  paymentsCreated      Payment[]        @relation("PaymentCreatedBy")
-  paymentLogsEdited    PaymentLog[]     @relation("PaymentLogEditedBy")
-  cashCollectedFrom    CashCollection[] @relation("CashCollectedFromTeacher")
-  cashCollectedBy      CashCollection[] @relation("CashCollectedByAdmin")
+  // Ставка за час индивидуального занятия — задаётся Супер-Админом персонально
+  // для каждого преподавателя, у разных преподавателей ставка может отличаться.
+  individualLessonRate Decimal? @db.Decimal(10, 2)
+  // Telegram-чат самого преподавателя (не путать с parentTelegramChatId у ученика) —
+  // используется для уведомлений о новых/изменённых индивидуальных занятиях.
+  telegramChatId       String?
+
+  groupsTaught          Group[]              @relation("GroupTeachers")
+  paymentsCreated       Payment[]            @relation("PaymentCreatedBy")
+  paymentLogsEdited     PaymentLog[]         @relation("PaymentLogEditedBy")
+  cashCollectedFrom     CashCollection[]     @relation("CashCollectedFromTeacher")
+  cashCollectedBy       CashCollection[]     @relation("CashCollectedByAdmin")
+  individualLessons     IndividualLesson[]   @relation("IndividualLessonTeacher")
+  individualLessonsMade IndividualLesson[]   @relation("IndividualLessonCreatedBy")
 
   @@index([tenantId])
 }
@@ -122,7 +133,8 @@ model Student {
   statusUntil          DateTime?
   createdAt            DateTime       @default(now())
 
-  payments Payment[]
+  payments               Payment[]
+  individualLessonShares IndividualLessonParticipant[]
 
   @@index([tenantId])
   @@index([groupId])
@@ -163,6 +175,44 @@ model CashCollection {
 
   @@index([tenantId])
   @@index([teacherId])
+}
+
+// Индивидуальное занятие: один преподаватель, одна дата/время, один или несколько учеников.
+// Итоговая стоимость = ставка преподавателя (зафиксированная на момент создания) × часы,
+// делится поровну между участниками — см. IndividualLessonParticipant.
+model IndividualLesson {
+  id                String   @id @default(uuid())
+  tenantId          String
+  tenant            Tenant   @relation(fields: [tenantId], references: [id])
+  teacherId         String
+  teacher           User     @relation("IndividualLessonTeacher", fields: [teacherId], references: [id])
+  startAt           DateTime
+  durationMinutes   Int
+  hourlyRateSnapshot Decimal @db.Decimal(10, 2)
+  totalPrice        Decimal  @db.Decimal(10, 2)
+  createdById       String
+  createdBy         User     @relation("IndividualLessonCreatedBy", fields: [createdById], references: [id])
+  createdAt         DateTime @default(now())
+
+  participants IndividualLessonParticipant[]
+
+  @@index([tenantId])
+  @@index([teacherId])
+}
+
+model IndividualLessonParticipant {
+  id                 String           @id @default(uuid())
+  individualLessonId String
+  individualLesson   IndividualLesson @relation(fields: [individualLessonId], references: [id])
+  studentId          String
+  student            Student          @relation(fields: [studentId], references: [id])
+  shareAmount        Decimal          @db.Decimal(10, 2)
+  isPaid             Boolean          @default(false)
+  paymentMethod      PaymentMethod?
+  paidAt             DateTime?
+
+  @@index([individualLessonId])
+  @@index([studentId])
 }
 
 model PaymentLog {

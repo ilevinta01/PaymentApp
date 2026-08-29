@@ -18,6 +18,7 @@ import { PaymentLogsModule } from "./payment-logs/payment-logs.module";
 import { PlatformModule } from "./platform/platform.module";
 import { ReportsModule } from "./reports/reports.module";
 import { CashCollectionsModule } from "./cash-collections/cash-collections.module";
+import { IndividualLessonsModule } from "./individual-lessons/individual-lessons.module";
 import { HealthModule } from "./health/health.module";
 
 @Module({
@@ -36,6 +37,7 @@ import { HealthModule } from "./health/health.module";
     PlatformModule,
     ReportsModule,
     CashCollectionsModule,
+    IndividualLessonsModule,
     HealthModule,
   ],
   providers: [

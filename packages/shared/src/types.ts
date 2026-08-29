@@ -23,6 +23,7 @@ export interface TenantSettingsDto {
   isTelegramEnabled: boolean;
   isCashCollectionEnabled: boolean;
   isTeacherEarningsEnabled: boolean;
+  isIndividualLessonsEnabled: boolean;
   telegramBotToken: string | null;
   primaryColor: string | null;
   logoUrl: string | null;
@@ -78,6 +79,8 @@ export interface UserDto {
   role: Role;
   isActive: boolean;
   groupIds?: string[];
+  individualLessonRate?: string | null;
+  telegramChatId?: string | null;
 }
 
 export interface PaymentDto {
@@ -111,6 +114,7 @@ export interface TenantSummaryDto {
   isTelegramEnabled: boolean;
   isCashCollectionEnabled: boolean;
   isTeacherEarningsEnabled: boolean;
+  isIndividualLessonsEnabled: boolean;
   owner: { fullName: string; email: string; phone: string | null } | null;
 }
 
@@ -140,6 +144,28 @@ export interface CashCollectionDto {
   amount: string;
   collectedByName: string;
   collectedAt: string;
+}
+
+export interface IndividualLessonParticipantDto {
+  id: string;
+  studentId: string;
+  studentName: string;
+  shareAmount: string;
+  isPaid: boolean;
+  paymentMethod: PaymentMethod | null;
+  paidAt: string | null;
+}
+
+export interface IndividualLessonDto {
+  id: string;
+  teacherId: string;
+  teacherName: string;
+  startAt: string;
+  durationMinutes: number;
+  hourlyRateSnapshot: string;
+  totalPrice: string;
+  createdAt: string;
+  participants: IndividualLessonParticipantDto[];
 }
 
 export interface PaymentLogDto {

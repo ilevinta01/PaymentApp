@@ -22,7 +22,13 @@ export async function createStaff(payload: StaffPayload) {
 
 export async function updateStaff(
   id: string,
-  payload: { fullName?: string; phone?: string; groupIds?: string[] },
+  payload: {
+    fullName?: string;
+    phone?: string;
+    groupIds?: string[];
+    individualLessonRate?: number;
+    telegramChatId?: string;
+  },
 ) {
   const { data } = await apiClient.patch<UserDto>(`/users/${id}`, payload);
   return data;

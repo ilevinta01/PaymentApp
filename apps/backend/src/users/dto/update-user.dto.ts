@@ -1,4 +1,4 @@
-import { IsArray, IsOptional, IsString } from "class-validator";
+import { IsArray, IsNumber, IsOptional, IsString, Min } from "class-validator";
 
 export class UpdateUserDto {
   @IsOptional()
@@ -13,4 +13,13 @@ export class UpdateUserDto {
   @IsArray()
   @IsString({ each: true })
   groupIds?: string[];
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  individualLessonRate?: number;
+
+  @IsOptional()
+  @IsString()
+  telegramChatId?: string;
 }
