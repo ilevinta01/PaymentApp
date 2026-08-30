@@ -20,4 +20,8 @@ export class UpdateFeaturesDto {
   @IsOptional()
   @IsBoolean()
   isIndividualLessonsEnabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isScheduleEnabled?: boolean;
 }

@@ -5,6 +5,7 @@ import { Role, StudentStatus } from "@oplata/shared";
 import { deleteGroup, getGroups, setGroupTeachers, updateGroup } from "../../api/groups";
 import { deleteStudent, getStudents, updateStudent } from "../../api/students";
 import { getStaff } from "../../api/users";
+import { getTenantSettings } from "../../api/tenantSettings";
 import { useBasePath } from "../../hooks/useBasePath";
 import { useAuthStore } from "../../store/auth.store";
 import GroupScheduleEditor from "../../components/GroupScheduleEditor";
@@ -172,6 +173,7 @@ export default function GroupDetailPage() {
 
   const { data: groups } = useQuery({ queryKey: ["groups"], queryFn: getGroups });
   const { data: staff } = useQuery({ queryKey: ["staff"], queryFn: getStaff, enabled: isAdmin });
+  const { data: settings } = useQuery({ queryKey: ["tenant-settings"], queryFn: getTenantSettings });
   const { data: students, isLoading } = useQuery({
     queryKey: ["students", { groupId }],
     queryFn: () => getStudents({ groupId }),
@@ -261,7 +263,7 @@ export default function GroupDetailPage() {
             </button>
           </div>
 
-          <GroupScheduleEditor group={group} onChanged={invalidateGroups} />
+          {settings?.isScheduleEnabled && <GroupScheduleEditor group={group} onChanged={invalidateGroups} />}
 
           <div className="border-t border-slate-100 pt-3">
             <button

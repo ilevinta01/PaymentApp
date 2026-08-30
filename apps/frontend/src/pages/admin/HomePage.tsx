@@ -17,11 +17,9 @@ export default function HomePage() {
         <BigButton to="/admin/reports" label="Отчёты" />
         <BigButton to="/admin/staff" label="Сотрудники" />
         {settings?.isIndividualLessonsEnabled && (
-          <>
-            <BigButton to="/admin/individual-lessons" label="Индивидуальные занятия" />
-            <BigButton to="/admin/schedule" label="Расписание" />
-          </>
+          <BigButton to="/admin/individual-lessons" label="Индивидуальные занятия" />
         )}
+        {settings?.isScheduleEnabled && <BigButton to="/admin/schedule" label="Расписание" />}
         <div className="col-span-2">
           <BigButton to="/admin/settings" label="Настройки" />
         </div>

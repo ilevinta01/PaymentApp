@@ -3,7 +3,8 @@ export type FeatureKey =
   | "isTelegramEnabled"
   | "isCashCollectionEnabled"
   | "isTeacherEarningsEnabled"
-  | "isIndividualLessonsEnabled";
+  | "isIndividualLessonsEnabled"
+  | "isScheduleEnabled";
 
 export interface FeatureDefinition {
   key: FeatureKey;
@@ -39,6 +40,12 @@ export const FEATURE_DEFINITIONS: FeatureDefinition[] = [
     label: "Индивидуальные занятия",
     description:
       "Создание индивидуальных занятий на одного или нескольких учеников с уведомлением учителя и родителей и раздельным учётом оплаты.",
+  },
+  {
+    key: "isScheduleEnabled",
+    label: "Расписание",
+    description:
+      "Еженедельное расписание групп у администратора и просмотр своего расписания преподавателем по неделям (включая индивидуальные занятия).",
   },
 ];
 

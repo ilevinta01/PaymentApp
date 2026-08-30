@@ -15,11 +15,9 @@ export default function HomePage() {
         <BigButton to="/teacher/groups" label="Группы" />
         <BigButton to="/teacher/search" label="Поиск ученика" />
         {settings?.isIndividualLessonsEnabled && (
-          <>
-            <BigButton to="/teacher/individual-lessons" label="Индивидуальные занятия" />
-            <BigButton to="/teacher/schedule" label="Расписание" />
-          </>
+          <BigButton to="/teacher/individual-lessons" label="Индивидуальные занятия" />
         )}
+        {settings?.isScheduleEnabled && <BigButton to="/teacher/schedule" label="Расписание" />}
       </div>
     </div>
   );

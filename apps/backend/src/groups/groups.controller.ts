@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/commo
 import { JwtPayload, Role } from "@oplata/shared";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
+import { RequireFeature } from "../tenants/decorators/require-feature.decorator";
 import { CreateGroupDto } from "./dto/create-group.dto";
 import { CreateScheduleSlotDto } from "./dto/create-schedule-slot.dto";
 import { SetGroupTeachersDto } from "./dto/set-group-teachers.dto";
@@ -41,12 +42,14 @@ export class GroupsController {
     return this.service.setTeachers(user.tenantId, id, dto);
   }
 
+  @RequireFeature("isScheduleEnabled")
   @Roles(Role.SUPER_ADMIN)
   @Post(":id/schedule-slots")
   addScheduleSlot(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Body() dto: CreateScheduleSlotDto) {
     return this.service.addScheduleSlot(user.tenantId, id, dto);
   }
 
+  @RequireFeature("isScheduleEnabled")
   @Roles(Role.SUPER_ADMIN)
   @Patch("schedule-slots/:slotId")
   updateScheduleSlot(
@@ -57,6 +60,7 @@ export class GroupsController {
     return this.service.updateScheduleSlot(user.tenantId, slotId, dto);
   }
 
+  @RequireFeature("isScheduleEnabled")
   @Roles(Role.SUPER_ADMIN)
   @Delete("schedule-slots/:slotId")
   removeScheduleSlot(@CurrentUser() user: JwtPayload, @Param("slotId") slotId: string) {

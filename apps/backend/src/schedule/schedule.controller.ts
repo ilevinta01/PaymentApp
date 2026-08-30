@@ -5,7 +5,7 @@ import { Roles } from "../auth/decorators/roles.decorator";
 import { RequireFeature } from "../tenants/decorators/require-feature.decorator";
 import { ScheduleService } from "./schedule.service";
 
-@RequireFeature("isIndividualLessonsEnabled")
+@RequireFeature("isScheduleEnabled")
 @Roles(Role.SUPER_ADMIN, Role.TEACHER)
 @Controller("schedule")
 export class ScheduleController {

@@ -24,6 +24,7 @@ export interface TenantSettingsDto {
   isCashCollectionEnabled: boolean;
   isTeacherEarningsEnabled: boolean;
   isIndividualLessonsEnabled: boolean;
+  isScheduleEnabled: boolean;
   telegramBotToken: string | null;
   primaryColor: string | null;
   logoUrl: string | null;
@@ -139,6 +140,7 @@ export interface TenantSummaryDto {
   isCashCollectionEnabled: boolean;
   isTeacherEarningsEnabled: boolean;
   isIndividualLessonsEnabled: boolean;
+  isScheduleEnabled: boolean;
   owner: { fullName: string; email: string; phone: string | null } | null;
 }
 

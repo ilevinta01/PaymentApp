@@ -20,6 +20,7 @@ export class TenantSettingsService {
         isCashCollectionEnabled: false,
         isTeacherEarningsEnabled: false,
         isIndividualLessonsEnabled: false,
+        isScheduleEnabled: false,
         telegramBotToken: null,
         primaryColor: null,
         logoUrl: null,

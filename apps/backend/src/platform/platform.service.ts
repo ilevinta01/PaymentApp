@@ -31,6 +31,7 @@ export class PlatformService {
             isCashCollectionEnabled: true,
             isTeacherEarningsEnabled: true,
             isIndividualLessonsEnabled: true,
+            isScheduleEnabled: true,
           },
         },
         _count: { select: { users: true, students: true } },
@@ -62,6 +63,7 @@ export class PlatformService {
       isCashCollectionEnabled: tenant.settings?.isCashCollectionEnabled ?? false,
       isTeacherEarningsEnabled: tenant.settings?.isTeacherEarningsEnabled ?? false,
       isIndividualLessonsEnabled: tenant.settings?.isIndividualLessonsEnabled ?? false,
+      isScheduleEnabled: tenant.settings?.isScheduleEnabled ?? false,
       owner: tenant.users[0] ?? null,
     }));
   }

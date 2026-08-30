@@ -57,6 +57,7 @@ model TenantSettings {
   isCashCollectionEnabled  Boolean @default(false)
   isTeacherEarningsEnabled Boolean @default(false)
   isIndividualLessonsEnabled Boolean @default(false)
+  isScheduleEnabled        Boolean @default(false)
   telegramBotToken         String?
   primaryColor             String?
   logoUrl                  String?
