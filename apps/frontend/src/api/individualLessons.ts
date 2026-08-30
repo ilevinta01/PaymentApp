@@ -31,8 +31,11 @@ export async function deleteIndividualLesson(lessonId: string) {
   return data;
 }
 
-export async function markIndividualLessonParticipantPaid(participantId: string, paymentMethod: PaymentMethod) {
-  const { data } = await apiClient.post(`/individual-lessons/participants/${participantId}/pay`, { paymentMethod });
+export async function markIndividualLessonParticipantPaid(
+  participantId: string,
+  payload: { paymentMethod: PaymentMethod } | { fromBalance: true },
+) {
+  const { data } = await apiClient.post(`/individual-lessons/participants/${participantId}/pay`, payload);
   return data;
 }
 

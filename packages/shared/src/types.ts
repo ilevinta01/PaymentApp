@@ -103,11 +103,22 @@ export interface StudentDto {
   parentPhone: string | null;
   parentTelegramChatId: string | null;
   isPaidCurrentMonth?: boolean;
+  balance: string;
   group?: {
     id: string;
     name: string;
     monthlyPrice: string;
   };
+}
+
+export interface BalanceTransactionDto {
+  id: string;
+  amount: string;
+  kind: "DEPOSIT" | "GROUP_CONSUMPTION" | "INDIVIDUAL_CONSUMPTION";
+  paymentMethod: PaymentMethod | null;
+  note: string | null;
+  createdBy: { fullName: string };
+  createdAt: string;
 }
 
 export interface ReportSummaryDto {
@@ -142,6 +153,10 @@ export interface GroupPaymentsReportDto {
   cardTotal: string;
   paymentsCount: number;
   payments: GroupPaymentEntryDto[];
+  // Пополнения баланса (аванса) учеников этой группы за период — реальные новые деньги,
+  // показаны отдельно от totalCollected/cashTotal/cardTotal, чтобы не путать с оплатой за месяц.
+  depositsTotal: string;
+  deposits: GroupPaymentEntryDto[];
 }
 
 export interface IndividualDebtorDto {
@@ -230,6 +245,7 @@ export interface TeacherEarningsDto {
   totalAmount: string;
   groupTotal: string;
   individualTotal: string;
+  depositsTotal: string;
   groups: { groupId: string; groupName: string; amount: string }[];
   payments: {
     id: string;
@@ -267,9 +283,12 @@ export interface IndividualLessonParticipantDto {
   id: string;
   studentId: string;
   studentName: string;
+  // Присутствует только в ответах, где загружается вместе с занятием (не в /by-student).
+  studentBalance?: string;
   shareAmount: string;
   isPaid: boolean;
   paymentMethod: PaymentMethod | null;
+  paidFromBalance: boolean;
   paidAt: string | null;
 }
 

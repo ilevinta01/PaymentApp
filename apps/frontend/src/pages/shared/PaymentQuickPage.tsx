@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { PaymentMethod, Role, StudentDto } from "@oplata/shared";
-import { getStudents } from "../../api/students";
+import { BalanceTransactionDto, PaymentMethod, Role, StudentDto } from "@oplata/shared";
+import { getStudents, getStudent, depositBalance, getBalanceTransactions } from "../../api/students";
 import { getGroups } from "../../api/groups";
 import { createPayment } from "../../api/payments";
 import { getIndividualLessonsForStudent, markIndividualLessonParticipantPaid } from "../../api/individualLessons";
@@ -9,6 +9,12 @@ import { getTenantSettings } from "../../api/tenantSettings";
 import { useAuthStore } from "../../store/auth.store";
 
 type Mode = "search" | "groups";
+
+const KIND_LABEL: Record<BalanceTransactionDto["kind"], string> = {
+  DEPOSIT: "Пополнение",
+  GROUP_CONSUMPTION: "Списание за месяц",
+  INDIVIDUAL_CONSUMPTION: "Списание за индивидуальное",
+};
 
 function StudentRow({ student, onSelect }: { student: StudentDto; onSelect: () => void }) {
   return (
@@ -30,18 +36,32 @@ function StudentRow({ student, onSelect }: { student: StudentDto; onSelect: () =
   );
 }
 
-function IndividualLessonsSection({ studentId, isCardEnabled }: { studentId: string; isCardEnabled: boolean }) {
+function IndividualLessonsSection({
+  student,
+  isCardEnabled,
+  onStudentUpdated,
+}: {
+  student: StudentDto;
+  isCardEnabled: boolean;
+  onStudentUpdated: (s: StudentDto) => void;
+}) {
   const queryClient = useQueryClient();
   const { data: lessons } = useQuery({
-    queryKey: ["individual-lessons-for-student", studentId],
-    queryFn: () => getIndividualLessonsForStudent(studentId),
+    queryKey: ["individual-lessons-for-student", student.id],
+    queryFn: () => getIndividualLessonsForStudent(student.id),
   });
 
   const payMutation = useMutation({
-    mutationFn: ({ participantId, method }: { participantId: string; method: PaymentMethod }) =>
-      markIndividualLessonParticipantPaid(participantId, method),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["individual-lessons-for-student", studentId] });
+    mutationFn: (payload: { participantId: string } & Parameters<typeof markIndividualLessonParticipantPaid>[1]) => {
+      const { participantId, ...rest } = payload;
+      return markIndividualLessonParticipantPaid(participantId, rest);
+    },
+    onSuccess: async (_result, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["individual-lessons-for-student", student.id] });
+      if ("fromBalance" in variables) {
+        const updated = await getStudent(student.id);
+        onStudentUpdated(updated);
+      }
     },
   });
 
@@ -54,6 +74,7 @@ function IndividualLessonsSection({ studentId, isCardEnabled }: { studentId: str
       <ul className="space-y-2">
         {unpaid.map((p) => {
           const isUpcoming = new Date(p.individualLesson.startAt) > new Date();
+          const canPayFromBalance = Number(student.balance) >= Number(p.shareAmount);
           return (
             <li key={p.id} className="rounded-lg bg-slate-50 p-3 text-sm">
               <div className="flex items-center justify-between gap-2">
@@ -73,7 +94,7 @@ function IndividualLessonsSection({ studentId, isCardEnabled }: { studentId: str
               </div>
               <div className="mt-2 flex gap-2">
                 <button
-                  onClick={() => payMutation.mutate({ participantId: p.id, method: PaymentMethod.CASH })}
+                  onClick={() => payMutation.mutate({ participantId: p.id, paymentMethod: PaymentMethod.CASH })}
                   disabled={payMutation.isPending}
                   className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-600"
                 >
@@ -81,11 +102,20 @@ function IndividualLessonsSection({ studentId, isCardEnabled }: { studentId: str
                 </button>
                 {isCardEnabled && (
                   <button
-                    onClick={() => payMutation.mutate({ participantId: p.id, method: PaymentMethod.CARD })}
+                    onClick={() => payMutation.mutate({ participantId: p.id, paymentMethod: PaymentMethod.CARD })}
                     disabled={payMutation.isPending}
                     className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-600"
                   >
                     Карта
+                  </button>
+                )}
+                {canPayFromBalance && (
+                  <button
+                    onClick={() => payMutation.mutate({ participantId: p.id, fromBalance: true })}
+                    disabled={payMutation.isPending}
+                    className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-600"
+                  >
+                    С баланса
                   </button>
                 )}
               </div>
@@ -97,7 +127,110 @@ function IndividualLessonsSection({ studentId, isCardEnabled }: { studentId: str
   );
 }
 
-function PaymentForm({ student, onDone }: { student: StudentDto; onDone: () => void }) {
+function BalanceSection({
+  student,
+  onStudentUpdated,
+}: {
+  student: StudentDto;
+  onStudentUpdated: (s: StudentDto) => void;
+}) {
+  const queryClient = useQueryClient();
+  const { data: settings } = useQuery({ queryKey: ["tenant-settings"], queryFn: getTenantSettings });
+  const [amount, setAmount] = useState("");
+  const [method, setMethod] = useState<PaymentMethod>(PaymentMethod.CASH);
+  const [showHistory, setShowHistory] = useState(false);
+  const { data: history } = useQuery({
+    queryKey: ["balance-transactions", student.id],
+    queryFn: () => getBalanceTransactions(student.id),
+    enabled: showHistory,
+  });
+
+  const mutation = useMutation({
+    mutationFn: () => depositBalance(student.id, { amount: Number(amount), paymentMethod: method }),
+    onSuccess: (updated) => {
+      setAmount("");
+      onStudentUpdated(updated);
+      queryClient.invalidateQueries({ queryKey: ["students"] });
+      queryClient.invalidateQueries({ queryKey: ["debtors"] });
+      queryClient.invalidateQueries({ queryKey: ["balance-transactions", student.id] });
+    },
+  });
+
+  return (
+    <div className="space-y-2 border-t border-slate-100 pt-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-medium text-slate-700">Баланс (аванс): {student.balance}</p>
+        <button onClick={() => setShowHistory((v) => !v)} className="text-xs font-medium text-[var(--brand-primary)]">
+          {showHistory ? "Скрыть историю" : "История"}
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <input
+          type="number"
+          min={0.01}
+          step="0.01"
+          placeholder="Сумма пополнения"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          className="w-40 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+        />
+        {settings?.isCardEnabled && (
+          <select
+            value={method}
+            onChange={(e) => setMethod(e.target.value as PaymentMethod)}
+            className="rounded-lg border border-slate-300 px-2 py-2 text-sm"
+          >
+            <option value={PaymentMethod.CASH}>Наличные</option>
+            <option value={PaymentMethod.CARD}>Карта</option>
+          </select>
+        )}
+        <button
+          onClick={() => mutation.mutate()}
+          disabled={mutation.isPending || !amount}
+          className="rounded-lg bg-[var(--brand-primary)] px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+        >
+          {mutation.isPending ? "Пополняем…" : "Пополнить"}
+        </button>
+      </div>
+      {mutation.isError && <p className="text-sm text-red-600">Не удалось пополнить баланс.</p>}
+      {mutation.isSuccess && mutation.data && (
+        <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-700">
+          {mutation.data.coveredMonths.length > 0
+            ? `Пополнено. Автоматически оплачено за: ${mutation.data.coveredMonths.join(", ")}.`
+            : "Баланс пополнен."}
+        </p>
+      )}
+      {showHistory && (
+        <ul className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 bg-white text-xs">
+          {history?.map((t) => (
+            <li key={t.id} className="flex items-center justify-between gap-2 px-3 py-2">
+              <span className={Number(t.amount) > 0 ? "font-medium text-emerald-600" : "text-slate-600"}>
+                {Number(t.amount) > 0 ? "+" : ""}
+                {t.amount}
+              </span>
+              <span className="flex-1 px-2 text-slate-500">
+                {KIND_LABEL[t.kind]}
+                {t.note ? ` · ${t.note}` : ""}
+              </span>
+              <span className="text-slate-400">{new Date(t.createdAt).toLocaleDateString("ru-RU")}</span>
+            </li>
+          ))}
+          {history?.length === 0 && <li className="px-3 py-2 text-slate-400">Пока пусто</li>}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function PaymentForm({
+  student,
+  onDone,
+  onStudentUpdated,
+}: {
+  student: StudentDto;
+  onDone: () => void;
+  onStudentUpdated: (s: StudentDto) => void;
+}) {
   const queryClient = useQueryClient();
   const isAdmin = useAuthStore((s) => s.user?.role) === Role.SUPER_ADMIN;
   const { data: settings } = useQuery({ queryKey: ["tenant-settings"], queryFn: getTenantSettings });
@@ -175,8 +308,14 @@ function PaymentForm({ student, onDone }: { student: StudentDto; onDone: () => v
         <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">Оплата записана. Можно выбрать следующего ученика.</p>
       )}
 
+      {isAdmin && <BalanceSection student={student} onStudentUpdated={onStudentUpdated} />}
+
       {settings?.isIndividualLessonsEnabled && (
-        <IndividualLessonsSection studentId={student.id} isCardEnabled={!!settings?.isCardEnabled} />
+        <IndividualLessonsSection
+          student={student}
+          isCardEnabled={!!settings?.isCardEnabled}
+          onStudentUpdated={onStudentUpdated}
+        />
       )}
     </div>
   );
@@ -209,7 +348,7 @@ export default function PaymentQuickPage() {
       <h2 className="text-lg font-semibold text-slate-900">Оплата</h2>
 
       {selected ? (
-        <PaymentForm student={selected} onDone={() => setSelected(null)} />
+        <PaymentForm student={selected} onDone={() => setSelected(null)} onStudentUpdated={setSelected} />
       ) : (
         <>
           <div className="flex gap-2">

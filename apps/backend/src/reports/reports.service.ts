@@ -7,6 +7,11 @@ import { PrismaService } from "../prisma/prisma.service";
 
 const METHOD_LABEL: Record<string, string> = { CASH: "Наличные", CARD: "Карта" };
 
+function periodMonthRange(month: string): { start: Date; end: Date } {
+  const [year, mon] = month.split("-").map(Number);
+  return { start: new Date(year, mon - 1, 1), end: new Date(year, mon, 1) };
+}
+
 @Injectable()
 export class ReportsService {
   constructor(
@@ -16,10 +21,17 @@ export class ReportsService {
 
   async getSummary(tenantId: string, periodMonth?: string) {
     const month = periodMonth ?? getCurrentPeriodMonth();
+    const { start, end } = periodMonthRange(month);
 
-    const [payments, studentsCount, debtors] = await Promise.all([
+    // fundedFromBalance:false — списания с баланса ученика не новая выручка (деньги уже
+    // учтены в момент пополнения, см. DEPOSIT ниже), иначе доход задвоился бы.
+    const [payments, deposits, studentsCount, debtors] = await Promise.all([
       this.prisma.payment.findMany({
-        where: { tenantId, periodMonth: month },
+        where: { tenantId, periodMonth: month, fundedFromBalance: false },
+        select: { amount: true, paymentMethod: true },
+      }),
+      this.prisma.balanceTransaction.findMany({
+        where: { tenantId, kind: "DEPOSIT", createdAt: { gte: start, lt: end } },
         select: { amount: true, paymentMethod: true },
       }),
       this.prisma.student.count({ where: { tenantId } }),
@@ -35,13 +47,18 @@ export class ReportsService {
       if (payment.paymentMethod === PaymentMethod.CASH) cashTotal += amount;
       else cardTotal += amount;
     }
+    for (const deposit of deposits) {
+      const amount = Number(deposit.amount);
+      if (deposit.paymentMethod === PaymentMethod.CASH) cashTotal += amount;
+      else cardTotal += amount;
+    }
 
     return {
       periodMonth: month,
       totalCollected: (cashTotal + cardTotal).toFixed(2),
       cashTotal: cashTotal.toFixed(2),
       cardTotal: cardTotal.toFixed(2),
-      paymentsCount: payments.length,
+      paymentsCount: payments.length + deposits.length,
       studentsCount,
       debtorsCount: debtors.length,
     };
@@ -49,12 +66,20 @@ export class ReportsService {
 
   async getPaymentsByGroup(tenantId: string, periodMonth?: string) {
     const month = periodMonth ?? getCurrentPeriodMonth();
+    const { start, end } = periodMonthRange(month);
 
-    const payments = await this.prisma.payment.findMany({
-      where: { tenantId, periodMonth: month },
-      include: { student: { include: { group: { select: { id: true, name: true } } } } },
-      orderBy: { dateTime: "desc" },
-    });
+    const [payments, deposits] = await Promise.all([
+      this.prisma.payment.findMany({
+        where: { tenantId, periodMonth: month, fundedFromBalance: false },
+        include: { student: { include: { group: { select: { id: true, name: true } } } } },
+        orderBy: { dateTime: "desc" },
+      }),
+      this.prisma.balanceTransaction.findMany({
+        where: { tenantId, kind: "DEPOSIT", createdAt: { gte: start, lt: end } },
+        include: { student: { include: { group: { select: { id: true, name: true } } } } },
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
 
     const byGroup = new Map<
       string,
@@ -63,16 +88,30 @@ export class ReportsService {
         groupName: string;
         cashTotal: number;
         cardTotal: number;
+        depositsTotal: number;
         payments: { id: string; studentName: string; amount: string; paymentMethod: string; dateTime: Date }[];
+        deposits: { id: string; studentName: string; amount: string; paymentMethod: string; dateTime: Date }[];
       }
     >();
 
+    const ensure = (groupId: string, groupName: string) => {
+      if (!byGroup.has(groupId)) {
+        byGroup.set(groupId, {
+          groupId,
+          groupName,
+          cashTotal: 0,
+          cardTotal: 0,
+          depositsTotal: 0,
+          payments: [],
+          deposits: [],
+        });
+      }
+      return byGroup.get(groupId)!;
+    };
+
     for (const payment of payments) {
       const group = payment.student.group;
-      if (!byGroup.has(group.id)) {
-        byGroup.set(group.id, { groupId: group.id, groupName: group.name, cashTotal: 0, cardTotal: 0, payments: [] });
-      }
-      const entry = byGroup.get(group.id)!;
+      const entry = ensure(group.id, group.name);
       const amount = Number(payment.amount);
       if (payment.paymentMethod === PaymentMethod.CASH) entry.cashTotal += amount;
       else entry.cardTotal += amount;
@@ -85,6 +124,19 @@ export class ReportsService {
       });
     }
 
+    for (const deposit of deposits) {
+      const group = deposit.student.group;
+      const entry = ensure(group.id, group.name);
+      entry.depositsTotal += Number(deposit.amount);
+      entry.deposits.push({
+        id: deposit.id,
+        studentName: deposit.student.fullName,
+        amount: deposit.amount.toString(),
+        paymentMethod: deposit.paymentMethod ?? "CASH",
+        dateTime: deposit.createdAt,
+      });
+    }
+
     return Array.from(byGroup.values())
       .map((e) => ({
         groupId: e.groupId,
@@ -94,6 +146,8 @@ export class ReportsService {
         cardTotal: e.cardTotal.toFixed(2),
         paymentsCount: e.payments.length,
         payments: e.payments,
+        depositsTotal: e.depositsTotal.toFixed(2),
+        deposits: e.deposits,
       }))
       .sort((a, b) => a.groupName.localeCompare(b.groupName));
   }
@@ -133,8 +187,24 @@ export class ReportsService {
           });
         }
         sheet.addRow({});
-        const totalRow = sheet.addRow({ studentName: "Итого", amount: group.totalCollected });
-        totalRow.font = { bold: true };
+        const tuitionTotalRow = sheet.addRow({ studentName: "Итого за месяц", amount: group.totalCollected });
+        tuitionTotalRow.font = { bold: true };
+
+        if (group.deposits.length > 0) {
+          sheet.addRow({});
+          const header = sheet.addRow({ studentName: "Пополнения баланса (аванс)" });
+          header.font = { bold: true };
+          for (const d of group.deposits) {
+            sheet.addRow({
+              studentName: d.studentName,
+              amount: d.amount,
+              paymentMethod: METHOD_LABEL[d.paymentMethod] ?? d.paymentMethod,
+              dateTime: new Date(d.dateTime).toLocaleString("ru-RU"),
+            });
+          }
+          const depositsTotalRow = sheet.addRow({ studentName: "Итого пополнений", amount: group.depositsTotal });
+          depositsTotalRow.font = { bold: true };
+        }
       }
     }
 
@@ -234,13 +304,11 @@ export class ReportsService {
 
   async getTeacherEarnings(tenantId: string, periodMonth?: string) {
     const month = periodMonth ?? getCurrentPeriodMonth();
-    const [year, mon] = month.split("-").map(Number);
-    const monthStart = new Date(year, mon - 1, 1);
-    const monthEnd = new Date(year, mon, 1);
+    const { start: monthStart, end: monthEnd } = periodMonthRange(month);
 
-    const [payments, individualParticipants] = await Promise.all([
+    const [payments, individualParticipants, deposits] = await Promise.all([
       this.prisma.payment.findMany({
-        where: { tenantId, periodMonth: month },
+        where: { tenantId, periodMonth: month, fundedFromBalance: false },
         include: {
           student: { include: { group: { select: { id: true, name: true } } } },
           createdBy: { select: { id: true, fullName: true } },
@@ -248,12 +316,21 @@ export class ReportsService {
         orderBy: { dateTime: "desc" },
       }),
       this.prisma.individualLessonParticipant.findMany({
-        where: { isPaid: true, paidAt: { gte: monthStart, lt: monthEnd }, individualLesson: { tenantId } },
+        where: {
+          isPaid: true,
+          paidFromBalance: false,
+          paidAt: { gte: monthStart, lt: monthEnd },
+          individualLesson: { tenantId },
+        },
         include: {
           student: { select: { fullName: true } },
           individualLesson: { include: { teacher: { select: { id: true, fullName: true } } } },
         },
         orderBy: { paidAt: "desc" },
+      }),
+      this.prisma.balanceTransaction.findMany({
+        where: { tenantId, kind: "DEPOSIT", createdAt: { gte: monthStart, lt: monthEnd } },
+        include: { createdBy: { select: { id: true, fullName: true } } },
       }),
     ]);
 
@@ -264,6 +341,7 @@ export class ReportsService {
         teacherName: string;
         groupTotal: number;
         individualTotal: number;
+        depositsTotal: number;
         groupsMap: Map<string, { groupId: string; groupName: string; amount: number }>;
         payments: {
           id: string;
@@ -290,6 +368,7 @@ export class ReportsService {
           teacherName: name,
           groupTotal: 0,
           individualTotal: 0,
+          depositsTotal: 0,
           groupsMap: new Map(),
           payments: [],
           individualPayments: [],
@@ -329,13 +408,19 @@ export class ReportsService {
       });
     }
 
+    for (const deposit of deposits) {
+      const entry = ensure(deposit.createdBy.id, deposit.createdBy.fullName);
+      entry.depositsTotal += Number(deposit.amount);
+    }
+
     return Array.from(byTeacher.values())
       .map((e) => ({
         teacherId: e.teacherId,
         teacherName: e.teacherName,
-        totalAmount: (e.groupTotal + e.individualTotal).toFixed(2),
+        totalAmount: (e.groupTotal + e.individualTotal + e.depositsTotal).toFixed(2),
         groupTotal: e.groupTotal.toFixed(2),
         individualTotal: e.individualTotal.toFixed(2),
+        depositsTotal: e.depositsTotal.toFixed(2),
         groups: Array.from(e.groupsMap.values())
           .sort((a, b) => b.amount - a.amount)
           .map((g) => ({ ...g, amount: g.amount.toFixed(2) })),

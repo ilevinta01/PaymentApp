@@ -1,10 +1,14 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { JwtPayload, Role } from "@oplata/shared";
-import { getCurrentPeriodMonth } from "../common/period";
+import { getCurrentPeriodMonth, nextPeriodMonth } from "../common/period";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateStudentDto } from "./dto/create-student.dto";
+import { DepositBalanceDto } from "./dto/deposit-balance.dto";
 import { UpdateStudentDto } from "./dto/update-student.dto";
 import { UpdateStudentStatusDto } from "./dto/update-student-status.dto";
+
+// Предохранитель от аномально большого пополнения — не покрываем больше 5 лет вперёд за раз.
+const MAX_MONTHS_TO_COVER = 60;
 
 const WITH_GROUP = {
   group: { select: { id: true, name: true, monthlyPrice: true } },
@@ -117,6 +121,85 @@ export class StudentsService {
     }
     await this.prisma.student.delete({ where: { id } });
     return { success: true };
+  }
+
+  // Пополняет баланс (аванс) ученика и сразу же жадно списывает его в счёт ближайших
+  // ещё не оплаченных месяцев группы (столько месяцев подряд, на сколько хватает баланса),
+  // создавая обычные Payment-записи с fundedFromBalance=true — так все существующие отчёты
+  // и проверка должников продолжают работать без изменений, просто не считают эти записи
+  // "новой" выручкой (деньги уже были учтены в момент пополнения).
+  async depositBalance(tenantId: string, user: JwtPayload, studentId: string, dto: DepositBalanceDto) {
+    const student = await this.prisma.student.findFirst({ where: { id: studentId, tenantId }, include: WITH_GROUP });
+    if (!student) throw new NotFoundException("Ученик не найден");
+
+    if (dto.paymentMethod === "CARD") {
+      const settings = await this.prisma.tenantSettings.findUnique({ where: { tenantId } });
+      if (!settings?.isCardEnabled) {
+        throw new ForbiddenException("Оплата картой не включена в настройках детского центра");
+      }
+    }
+
+    const monthlyPrice = Number(student.group.monthlyPrice);
+    const coveredMonths: string[] = [];
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      await tx.balanceTransaction.create({
+        data: {
+          tenantId,
+          studentId,
+          amount: dto.amount,
+          kind: "DEPOSIT",
+          paymentMethod: dto.paymentMethod,
+          note: dto.note,
+          createdById: user.sub,
+        },
+      });
+
+      let balance = Number(student.balance) + dto.amount;
+      let cursor = getCurrentPeriodMonth();
+
+      for (let i = 0; i < MAX_MONTHS_TO_COVER && balance >= monthlyPrice; i++) {
+        const existing = await tx.payment.findFirst({ where: { tenantId, studentId, periodMonth: cursor } });
+        if (!existing) {
+          await tx.payment.create({
+            data: {
+              tenantId,
+              studentId,
+              amount: monthlyPrice,
+              paymentMethod: dto.paymentMethod,
+              createdById: user.sub,
+              periodMonth: cursor,
+              fundedFromBalance: true,
+            },
+          });
+          await tx.balanceTransaction.create({
+            data: {
+              tenantId,
+              studentId,
+              amount: -monthlyPrice,
+              kind: "GROUP_CONSUMPTION",
+              createdById: user.sub,
+              note: `Месяц ${cursor}`,
+            },
+          });
+          balance -= monthlyPrice;
+          coveredMonths.push(cursor);
+        }
+        cursor = nextPeriodMonth(cursor);
+      }
+
+      return tx.student.update({ where: { id: studentId }, data: { balance }, include: WITH_GROUP });
+    });
+
+    return { ...(await this.withPaidStatus(tenantId, [result]))[0], coveredMonths };
+  }
+
+  async getBalanceTransactions(tenantId: string, studentId: string) {
+    return this.prisma.balanceTransaction.findMany({
+      where: { tenantId, studentId },
+      include: { createdBy: { select: { fullName: true } } },
+      orderBy: { createdAt: "desc" },
+    });
   }
 
   // Помечает каждого ученика признаком оплаты за текущий расчётный месяц.

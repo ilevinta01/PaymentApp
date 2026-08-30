@@ -15,6 +15,8 @@ import { getTenantSettings } from "../../api/tenantSettings";
 import { getRooms } from "../../api/rooms";
 import { useAuthStore } from "../../store/auth.store";
 
+type PayVariables = { participantId: string } & Parameters<typeof markIndividualLessonParticipantPaid>[1];
+
 function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString("ru-RU", { dateStyle: "medium", timeStyle: "short" });
 }
@@ -412,7 +414,7 @@ function LessonRow({
   autoEdit: boolean;
   onChanged: () => void;
   onWarnings: (warnings: string[]) => void;
-  payMutation: ReturnType<typeof useMutation<unknown, Error, { participantId: string; method: PaymentMethod }>>;
+  payMutation: ReturnType<typeof useMutation<unknown, Error, PayVariables>>;
 }) {
   const [editing, setEditing] = useState(autoEdit && canEdit);
   const rowRef = useRef<HTMLLIElement>(null);
@@ -483,21 +485,31 @@ function LessonRow({
                 {p.studentName} — {p.shareAmount}
               </span>
               {p.isPaid ? (
-                <span className="text-emerald-600">Оплачено ({p.paymentMethod})</span>
+                <span className="text-emerald-600">
+                  Оплачено {p.paidFromBalance ? "(с баланса)" : `(${p.paymentMethod})`}
+                </span>
               ) : (
                 <div className="flex gap-2">
                   <button
-                    onClick={() => payMutation.mutate({ participantId: p.id, method: PaymentMethod.CASH })}
+                    onClick={() => payMutation.mutate({ participantId: p.id, paymentMethod: PaymentMethod.CASH })}
                     className="rounded-lg border border-slate-300 px-2 py-1 text-xs text-slate-600"
                   >
                     Наличные
                   </button>
                   {isCardEnabled && (
                     <button
-                      onClick={() => payMutation.mutate({ participantId: p.id, method: PaymentMethod.CARD })}
+                      onClick={() => payMutation.mutate({ participantId: p.id, paymentMethod: PaymentMethod.CARD })}
                       className="rounded-lg border border-slate-300 px-2 py-1 text-xs text-slate-600"
                     >
                       Карта
+                    </button>
+                  )}
+                  {p.studentBalance !== undefined && Number(p.studentBalance) >= Number(p.shareAmount) && (
+                    <button
+                      onClick={() => payMutation.mutate({ participantId: p.id, fromBalance: true })}
+                      className="rounded-lg border border-slate-300 px-2 py-1 text-xs text-slate-600"
+                    >
+                      С баланса
                     </button>
                   )}
                 </div>
@@ -523,8 +535,8 @@ export default function IndividualLessonsPage() {
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["individual-lessons"] });
 
   const payMutation = useMutation({
-    mutationFn: ({ participantId, method }: { participantId: string; method: PaymentMethod }) =>
-      markIndividualLessonParticipantPaid(participantId, method),
+    mutationFn: ({ participantId, ...payload }: PayVariables) =>
+      markIndividualLessonParticipantPaid(participantId, payload),
     onSuccess: invalidate,
   });
 

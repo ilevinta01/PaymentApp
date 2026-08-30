@@ -88,7 +88,26 @@ export default function PaymentsReportPage() {
                   </span>
                 </li>
               ))}
+              {group.payments.length === 0 && <li className="px-4 py-2 text-sm text-slate-400">Оплат нет</li>}
             </ul>
+            {group.deposits.length > 0 && (
+              <div className="border-t border-slate-100 bg-amber-50/40 px-4 py-2">
+                <p className="text-xs font-medium text-amber-700">
+                  Пополнения баланса за месяц: {group.depositsTotal}
+                </p>
+                <ul className="mt-1 space-y-1">
+                  {group.deposits.map((d) => (
+                    <li key={d.id} className="flex items-center justify-between gap-2 text-sm">
+                      <span className="text-slate-700">{d.studentName}</span>
+                      <span className="text-slate-500">
+                        {d.amount} · {d.paymentMethod === "CASH" ? "Наличные" : "Карта"} ·{" "}
+                        {new Date(d.dateTime).toLocaleString("ru-RU")}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         ))}
       </div>

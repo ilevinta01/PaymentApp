@@ -16,6 +16,7 @@ function TeacherRow({ teacher }: { teacher: TeacherEarningsDto }) {
           <p className="font-semibold text-slate-900">{teacher.teacherName}</p>
           <p className="text-sm text-slate-500">
             От групп: {teacher.groupTotal} · От индивидуальных: {teacher.individualTotal}
+            {Number(teacher.depositsTotal) > 0 ? ` · Пополнений баланса: ${teacher.depositsTotal}` : ""}
           </p>
         </div>
         <div className="flex items-center gap-2">

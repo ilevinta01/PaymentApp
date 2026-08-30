@@ -16,7 +16,7 @@ import { UpdateIndividualLessonDto } from "./dto/update-individual-lesson.dto";
 export const WITH_DETAILS = {
   teacher: { select: { id: true, fullName: true } },
   room: { select: { id: true, name: true } },
-  participants: { include: { student: { select: { id: true, fullName: true } } } },
+  participants: { include: { student: { select: { id: true, fullName: true, balance: true } } } },
 } as const;
 
 function splitEvenly(total: number, count: number): number[] {
@@ -43,10 +43,11 @@ export function mapLesson(lesson: {
   participants: {
     id: string;
     studentId: string;
-    student: { fullName: string };
+    student: { fullName: string; balance: unknown };
     shareAmount: unknown;
     isPaid: boolean;
     paymentMethod: string | null;
+    paidFromBalance: boolean;
     paidAt: Date | null;
   }[];
 }) {
@@ -66,9 +67,11 @@ export function mapLesson(lesson: {
       id: p.id,
       studentId: p.studentId,
       studentName: p.student.fullName,
+      studentBalance: p.student.balance,
       shareAmount: p.shareAmount,
       isPaid: p.isPaid,
       paymentMethod: p.paymentMethod,
+      paidFromBalance: p.paidFromBalance,
       paidAt: p.paidAt,
     })),
   };
@@ -350,14 +353,46 @@ export class IndividualLessonsService {
 
     const settings = await this.prisma.tenantSettings.findUnique({ where: { tenantId } });
 
-    if (dto.paymentMethod === PaymentMethod.CARD && !settings?.isCardEnabled) {
-      throw new ForbiddenException("Оплата картой не включена в настройках детского центра");
+    if (dto.fromBalance) {
+      const student = await this.prisma.student.findUnique({ where: { id: participant.studentId } });
+      if (!student || Number(student.balance) < Number(participant.shareAmount)) {
+        throw new BadRequestException("На балансе ученика недостаточно средств");
+      }
+    } else {
+      if (!dto.paymentMethod) throw new BadRequestException("Не указан способ оплаты");
+      if (dto.paymentMethod === PaymentMethod.CARD && !settings?.isCardEnabled) {
+        throw new ForbiddenException("Оплата картой не включена в настройках детского центра");
+      }
     }
 
-    const updated = await this.prisma.individualLessonParticipant.update({
-      where: { id: participantId },
-      data: { isPaid: true, paymentMethod: dto.paymentMethod, paidAt: new Date() },
-    });
+    const methodLabel = dto.fromBalance ? "С баланса (аванс)" : METHOD_LABEL[dto.paymentMethod!];
+
+    const [updated] = await this.prisma.$transaction([
+      this.prisma.individualLessonParticipant.update({
+        where: { id: participantId },
+        data: dto.fromBalance
+          ? { isPaid: true, paidFromBalance: true, paidAt: new Date() }
+          : { isPaid: true, paymentMethod: dto.paymentMethod, paidAt: new Date() },
+      }),
+      ...(dto.fromBalance
+        ? [
+            this.prisma.student.update({
+              where: { id: participant.studentId },
+              data: { balance: { decrement: participant.shareAmount } },
+            }),
+            this.prisma.balanceTransaction.create({
+              data: {
+                tenantId,
+                studentId: participant.studentId,
+                amount: -Number(participant.shareAmount),
+                kind: "INDIVIDUAL_CONSUMPTION",
+                createdById: user.sub,
+                note: `Индивидуальное занятие ${formatDateTime(participant.individualLesson.startAt)}`,
+              },
+            }),
+          ]
+        : []),
+    ]);
 
     await this.prisma.individualLessonLog.create({
       data: {
@@ -368,7 +403,7 @@ export class IndividualLessonsService {
         studentNames: participant.student.fullName,
         lessonStartAt: participant.individualLesson.startAt,
         amount: participant.shareAmount,
-        details: `Способ: ${METHOD_LABEL[dto.paymentMethod]}`,
+        details: `Способ: ${methodLabel}`,
       },
     });
 
@@ -380,7 +415,7 @@ export class IndividualLessonsService {
         `Преподаватель: ${participant.individualLesson.teacher.fullName}`,
         `Дата занятия: ${formatDateTime(participant.individualLesson.startAt)}`,
         `Сумма: ${participant.shareAmount}`,
-        `Способ: ${METHOD_LABEL[dto.paymentMethod]}`,
+        `Способ: ${methodLabel}`,
         `Оплату принял(а): ${collector?.fullName ?? "—"}`,
       ].join("\n");
       await this.telegram.sendMessage(settings.telegramBotToken, participant.student.parentTelegramChatId, text);

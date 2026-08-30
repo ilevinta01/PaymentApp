@@ -1,4 +1,4 @@
-import { StudentDto, StudentStatus } from "@oplata/shared";
+import { BalanceTransactionDto, PaymentMethod, StudentDto, StudentStatus } from "@oplata/shared";
 import { apiClient } from "./client";
 
 export async function getStudents(params?: { groupId?: string; search?: string }): Promise<StudentDto[]> {
@@ -38,5 +38,18 @@ export async function updateStudentStatus(id: string, payload: { status: Student
 
 export async function deleteStudent(id: string) {
   const { data } = await apiClient.delete(`/students/${id}`);
+  return data;
+}
+
+export async function depositBalance(
+  studentId: string,
+  payload: { amount: number; paymentMethod: PaymentMethod; note?: string },
+): Promise<StudentDto & { coveredMonths: string[] }> {
+  const { data } = await apiClient.post(`/students/${studentId}/balance/deposit`, payload);
+  return data;
+}
+
+export async function getBalanceTransactions(studentId: string): Promise<BalanceTransactionDto[]> {
+  const { data } = await apiClient.get<BalanceTransactionDto[]>(`/students/${studentId}/balance/transactions`);
   return data;
 }

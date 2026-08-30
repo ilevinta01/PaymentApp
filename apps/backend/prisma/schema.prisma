@@ -49,6 +49,7 @@ model Tenant {
   individualLessons IndividualLesson[]
   rooms             Room[]
   individualLessonLogs IndividualLessonLog[]
+  balanceTransactions  BalanceTransaction[]
 }
 
 // Физический зал/класс школы. allowDoubleBooking управляет строгостью проверки пересечений:
@@ -129,6 +130,7 @@ model User {
   individualLessons     IndividualLesson[]   @relation("IndividualLessonTeacher")
   individualLessonsMade IndividualLesson[]   @relation("IndividualLessonCreatedBy")
   individualLessonLogsActedBy IndividualLessonLog[] @relation("IndividualLessonLogActor")
+  balanceTransactionsCreated  BalanceTransaction[]  @relation("BalanceTransactionCreatedBy")
 
   @@index([tenantId])
 }
@@ -185,8 +187,13 @@ model Student {
   statusUntil          DateTime?
   createdAt            DateTime       @default(now())
 
+  // Аванс/баланс ученика: пополняется вручную (например, оплата за несколько месяцев вперёд)
+  // и автоматически списывается в счёт будущих месяцев группы и/или индивидуальных занятий.
+  balance Decimal @default(0) @db.Decimal(10, 2)
+
   payments               Payment[]
   individualLessonShares IndividualLessonParticipant[]
+  balanceTransactions    BalanceTransaction[]
 
   @@index([tenantId])
   @@index([groupId])
@@ -204,6 +211,10 @@ model Payment {
   createdBy     User          @relation("PaymentCreatedBy", fields: [createdById], references: [id])
   dateTime      DateTime      @default(now())
   periodMonth   String
+  // true — этот платёж не новые деньги, а автоматическое списание с баланса (аванса)
+  // ученика за этот месяц; исключается из сумм "собрано" в отчётах, чтобы не задваивать
+  // выручку (деньги уже были учтены в момент пополнения баланса).
+  fundedFromBalance Boolean @default(false)
 
   logs PaymentLog[]
 
@@ -268,6 +279,9 @@ model IndividualLessonParticipant {
   isPaid             Boolean          @default(false)
   paymentMethod      PaymentMethod?
   paidAt             DateTime?
+  // Оплачено списанием с баланса (аванса) ученика, а не наличными/картой в моменте —
+  // исключается из "заработано" в отчётах по преподавателям, чтобы не задваивать выручку.
+  paidFromBalance    Boolean          @default(false)
 
   @@index([individualLessonId])
   @@index([studentId])
@@ -311,4 +325,25 @@ model IndividualLessonLog {
   createdAt     DateTime @default(now())
 
   @@index([tenantId])
+}
+
+// История операций с балансом (авансом) ученика — пополнения и автоматические/ручные
+// списания в счёт группы или индивидуального занятия. kind: "DEPOSIT" | "GROUP_CONSUMPTION" |
+// "INDIVIDUAL_CONSUMPTION" (строка, не enum — см. комментарий у IndividualLessonLog выше).
+model BalanceTransaction {
+  id            String        @id @default(uuid())
+  tenantId      String
+  tenant        Tenant        @relation(fields: [tenantId], references: [id])
+  studentId     String
+  student       Student       @relation(fields: [studentId], references: [id])
+  amount        Decimal       @db.Decimal(10, 2)
+  kind          String
+  paymentMethod PaymentMethod?
+  note          String?
+  createdById   String
+  createdBy     User          @relation("BalanceTransactionCreatedBy", fields: [createdById], references: [id])
+  createdAt     DateTime      @default(now())
+
+  @@index([tenantId])
+  @@index([studentId])
 }

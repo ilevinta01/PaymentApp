@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PaymentMethod, Role, StudentStatus } from "@oplata/shared";
-import { getStudent, updateStudent, updateStudentStatus } from "../../api/students";
+import { depositBalance, getStudent, updateStudent, updateStudentStatus } from "../../api/students";
 import { createPayment } from "../../api/payments";
 import { getIndividualLessonsForStudent } from "../../api/individualLessons";
 import { getTenantSettings } from "../../api/tenantSettings";
@@ -56,6 +56,18 @@ export default function StudentDetailPage() {
     onSuccess: () => {
       invalidateStudent();
       setAmount("");
+    },
+  });
+
+  // Баланс (аванс) — только Супер-Админ пополняет (сумма произвольная, доверять её ввод
+  // преподавателю нельзя, как и произвольную сумму обычного платежа).
+  const [depositAmount, setDepositAmount] = useState("");
+  const [depositMethod, setDepositMethod] = useState<PaymentMethod>(PaymentMethod.CASH);
+  const depositMutation = useMutation({
+    mutationFn: () => depositBalance(studentId!, { amount: Number(depositAmount), paymentMethod: depositMethod }),
+    onSuccess: () => {
+      invalidateStudent();
+      setDepositAmount("");
     },
   });
 
@@ -173,6 +185,48 @@ export default function StudentDetailPage() {
             {paymentMutation.isPending ? "Сохраняем…" : "Записать оплату"}
           </button>
           {paymentMutation.isError && <p className="text-sm text-red-600">Не удалось записать оплату.</p>}
+        </div>
+      )}
+
+      {isAdmin && (
+        <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+          <h3 className="font-semibold text-slate-900">Баланс (аванс): {student.balance}</h3>
+          <div className="flex flex-wrap gap-2">
+            <input
+              type="number"
+              min={0.01}
+              step="0.01"
+              placeholder="Сумма пополнения"
+              value={depositAmount}
+              onChange={(e) => setDepositAmount(e.target.value)}
+              className="min-w-[140px] flex-1 rounded-lg border border-slate-300 px-3 py-2"
+            />
+            {settings?.isCardEnabled && (
+              <select
+                value={depositMethod}
+                onChange={(e) => setDepositMethod(e.target.value as PaymentMethod)}
+                className="rounded-lg border border-slate-300 px-3 py-2"
+              >
+                <option value={PaymentMethod.CASH}>Наличные</option>
+                <option value={PaymentMethod.CARD}>Карта</option>
+              </select>
+            )}
+            <button
+              onClick={() => depositMutation.mutate()}
+              disabled={depositMutation.isPending || !depositAmount}
+              className="rounded-lg bg-[var(--brand-primary)] px-4 py-2 font-medium text-white disabled:opacity-60"
+            >
+              {depositMutation.isPending ? "Пополняем…" : "Пополнить"}
+            </button>
+          </div>
+          {depositMutation.isError && <p className="text-sm text-red-600">Не удалось пополнить баланс.</p>}
+          {depositMutation.isSuccess && depositMutation.data && (
+            <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">
+              {depositMutation.data.coveredMonths.length > 0
+                ? `Пополнено. Автоматически оплачено за: ${depositMutation.data.coveredMonths.join(", ")}.`
+                : "Баланс пополнен."}
+            </p>
+          )}
         </div>
       )}
 
