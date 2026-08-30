@@ -1,82 +1,106 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { GroupDto } from "@oplata/shared";
-import { addScheduleSlot, removeScheduleSlot } from "../api/groups";
+import { addScheduleSlot, removeScheduleSlot, updateScheduleSlot } from "../api/groups";
 
-const DAY_LABELS = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
+const DAY_LABELS = ["Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"];
+// Отображаем неделю с понедельника — привычнее для восприятия, чем начиная с воскресенья,
+// хотя внутри dayOfWeek хранится по конвенции JS Date.getDay() (0 = вс).
+const DISPLAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
+
+interface DayState {
+  checked: boolean;
+  startTime: string;
+  endTime: string;
+  slotId?: string;
+}
+
+function buildInitialState(group: GroupDto): Record<number, DayState> {
+  const state: Record<number, DayState> = {};
+  for (let day = 0; day < 7; day++) {
+    const slot = group.scheduleSlots?.find((s) => s.dayOfWeek === day);
+    state[day] = slot
+      ? { checked: true, startTime: slot.startTime, endTime: slot.endTime, slotId: slot.id }
+      : { checked: false, startTime: "15:00", endTime: "16:00" };
+  }
+  return state;
+}
 
 export default function GroupScheduleEditor({ group, onChanged }: { group: GroupDto; onChanged: () => void }) {
-  const [dayOfWeek, setDayOfWeek] = useState(1);
-  const [startTime, setStartTime] = useState("15:00");
-  const [endTime, setEndTime] = useState("16:00");
+  const [days, setDays] = useState<Record<number, DayState>>(() => buildInitialState(group));
 
-  const addMutation = useMutation({
-    mutationFn: () => addScheduleSlot(group.id, { dayOfWeek, startTime, endTime }),
+  useEffect(() => {
+    setDays(buildInitialState(group));
+  }, [group.id, group.scheduleSlots]);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const jobs = DISPLAY_ORDER.map(async (day) => {
+        const state = days[day];
+        if (state.checked && !state.slotId) {
+          await addScheduleSlot(group.id, { dayOfWeek: day, startTime: state.startTime, endTime: state.endTime });
+        } else if (state.checked && state.slotId) {
+          await updateScheduleSlot(state.slotId, { startTime: state.startTime, endTime: state.endTime });
+        } else if (!state.checked && state.slotId) {
+          await removeScheduleSlot(state.slotId);
+        }
+      });
+      await Promise.all(jobs);
+    },
     onSuccess: onChanged,
   });
 
-  const removeMutation = useMutation({
-    mutationFn: (slotId: string) => removeScheduleSlot(slotId),
-    onSuccess: onChanged,
-  });
-
-  const slots = [...(group.scheduleSlots ?? [])].sort(
-    (a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime),
-  );
+  const setDay = (day: number, patch: Partial<DayState>) => {
+    setDays((prev) => ({ ...prev, [day]: { ...prev[day], ...patch } }));
+  };
 
   return (
     <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-3">
       <p className="text-sm font-medium text-slate-700">Расписание группы</p>
-      <ul className="space-y-1">
-        {slots.map((slot) => (
-          <li key={slot.id} className="flex items-center justify-between text-sm text-slate-600">
-            <span>
-              {DAY_LABELS[slot.dayOfWeek]} {slot.startTime}–{slot.endTime}
-            </span>
-            <button
-              onClick={() => removeMutation.mutate(slot.id)}
-              disabled={removeMutation.isPending}
-              className="text-red-600"
-            >
-              Удалить
-            </button>
-          </li>
-        ))}
-        {slots.length === 0 && <li className="text-sm text-slate-400">Расписание не задано</li>}
+      <ul className="space-y-2">
+        {DISPLAY_ORDER.map((day) => {
+          const state = days[day];
+          return (
+            <li key={day} className="space-y-1">
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={state.checked}
+                  onChange={(e) => setDay(day, { checked: e.target.checked })}
+                  className="h-4 w-4"
+                />
+                {DAY_LABELS[day]}
+              </label>
+              {state.checked && (
+                <div className="ml-6 flex items-center gap-2">
+                  <input
+                    type="time"
+                    value={state.startTime}
+                    onChange={(e) => setDay(day, { startTime: e.target.value })}
+                    className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                  />
+                  <span className="text-slate-400">–</span>
+                  <input
+                    type="time"
+                    value={state.endTime}
+                    onChange={(e) => setDay(day, { endTime: e.target.value })}
+                    className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                  />
+                </div>
+              )}
+            </li>
+          );
+        })}
       </ul>
-      <div className="flex flex-wrap items-center gap-2">
-        <select
-          value={dayOfWeek}
-          onChange={(e) => setDayOfWeek(Number(e.target.value))}
-          className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
-        >
-          {DAY_LABELS.map((label, i) => (
-            <option key={i} value={i}>
-              {label}
-            </option>
-          ))}
-        </select>
-        <input
-          type="time"
-          value={startTime}
-          onChange={(e) => setStartTime(e.target.value)}
-          className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
-        />
-        <input
-          type="time"
-          value={endTime}
-          onChange={(e) => setEndTime(e.target.value)}
-          className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
-        />
-        <button
-          onClick={() => addMutation.mutate()}
-          disabled={addMutation.isPending}
-          className="rounded-lg bg-[var(--brand-primary)] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60"
-        >
-          Добавить
-        </button>
-      </div>
-      {addMutation.isError && <p className="text-sm text-red-600">Не удалось добавить слот.</p>}
+      <button
+        onClick={() => saveMutation.mutate()}
+        disabled={saveMutation.isPending}
+        className="w-full rounded-lg bg-[var(--brand-primary)] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60"
+      >
+        {saveMutation.isPending ? "Сохраняем…" : "Сохранить расписание"}
+      </button>
+      {saveMutation.isError && <p className="text-sm text-red-600">Не удалось сохранить расписание.</p>}
+      {saveMutation.isSuccess && <p className="text-sm text-emerald-600">Расписание сохранено.</p>}
     </div>
   );
 }

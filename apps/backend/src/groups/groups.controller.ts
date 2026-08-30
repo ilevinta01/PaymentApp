@@ -5,6 +5,7 @@ import { Roles } from "../auth/decorators/roles.decorator";
 import { CreateGroupDto } from "./dto/create-group.dto";
 import { CreateScheduleSlotDto } from "./dto/create-schedule-slot.dto";
 import { SetGroupTeachersDto } from "./dto/set-group-teachers.dto";
+import { UpdateScheduleSlotDto } from "./dto/update-schedule-slot.dto";
 import { GroupsService } from "./groups.service";
 
 @Controller("groups")
@@ -44,6 +45,16 @@ export class GroupsController {
   @Post(":id/schedule-slots")
   addScheduleSlot(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Body() dto: CreateScheduleSlotDto) {
     return this.service.addScheduleSlot(user.tenantId, id, dto);
+  }
+
+  @Roles(Role.SUPER_ADMIN)
+  @Patch("schedule-slots/:slotId")
+  updateScheduleSlot(
+    @CurrentUser() user: JwtPayload,
+    @Param("slotId") slotId: string,
+    @Body() dto: UpdateScheduleSlotDto,
+  ) {
+    return this.service.updateScheduleSlot(user.tenantId, slotId, dto);
   }
 
   @Roles(Role.SUPER_ADMIN)

@@ -21,6 +21,11 @@ export async function addScheduleSlot(groupId: string, payload: { dayOfWeek: num
   return data;
 }
 
+export async function updateScheduleSlot(slotId: string, payload: { startTime: string; endTime: string }) {
+  const { data } = await apiClient.patch(`/groups/schedule-slots/${slotId}`, payload);
+  return data;
+}
+
 export async function removeScheduleSlot(slotId: string) {
   const { data } = await apiClient.delete(`/groups/schedule-slots/${slotId}`);
   return data;

@@ -4,6 +4,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { CreateGroupDto } from "./dto/create-group.dto";
 import { CreateScheduleSlotDto } from "./dto/create-schedule-slot.dto";
 import { SetGroupTeachersDto } from "./dto/set-group-teachers.dto";
+import { UpdateScheduleSlotDto } from "./dto/update-schedule-slot.dto";
 
 export function timeToMinutes(time: string): number {
   const [h, m] = time.split(":").map(Number);
@@ -112,6 +113,23 @@ export class GroupsService {
       data: { groupId, dayOfWeek: dto.dayOfWeek, startMinutes, endMinutes },
     });
     return mapSlot(slot);
+  }
+
+  async updateScheduleSlot(tenantId: string, slotId: string, dto: UpdateScheduleSlotDto) {
+    const slot = await this.prisma.groupScheduleSlot.findFirst({ where: { id: slotId, group: { tenantId } } });
+    if (!slot) throw new NotFoundException("Слот расписания не найден");
+
+    const startMinutes = timeToMinutes(dto.startTime);
+    const endMinutes = timeToMinutes(dto.endTime);
+    if (endMinutes <= startMinutes) {
+      throw new BadRequestException("Время окончания должно быть позже времени начала");
+    }
+
+    const updated = await this.prisma.groupScheduleSlot.update({
+      where: { id: slotId },
+      data: { startMinutes, endMinutes },
+    });
+    return mapSlot(updated);
   }
 
   async removeScheduleSlot(tenantId: string, slotId: string) {
