@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import { JwtPayload, PaymentMethod, Role } from "@oplata/shared";
@@ -84,6 +85,8 @@ const METHOD_LABEL: Record<PaymentMethod, string> = {
 
 @Injectable()
 export class IndividualLessonsService {
+  private readonly logger = new Logger(IndividualLessonsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly telegram: TelegramService,
@@ -468,7 +471,12 @@ export class IndividualLessonsService {
     studentConflicts: { studentId: string; groupName: string }[] = [],
   ) {
     const settings = await this.prisma.tenantSettings.findUnique({ where: { tenantId } });
-    if (!settings?.isTelegramEnabled || !settings.telegramBotToken) return;
+    if (!settings?.isTelegramEnabled || !settings.telegramBotToken) {
+      this.logger.warn(
+        `Уведомления об индивидуальном занятии не отправлены: Telegram выключен или токен не задан (tenantId=${tenantId})`,
+      );
+      return;
+    }
 
     const when = formatDateTime(lesson.startAt);
     const studentNames = lesson.participants.map((p) => p.student.fullName).join(", ");
@@ -486,6 +494,8 @@ export class IndividualLessonsService {
         `Сумма занятия: ${lesson.totalPrice}`,
       ].join("\n");
       await this.telegram.sendMessage(settings.telegramBotToken, teacherFull.telegramChatId, text);
+    } else {
+      this.logger.warn(`У преподавателя ${lesson.teacher.fullName} не указан telegramChatId — уведомление не отправлено`);
     }
 
     const students = await this.prisma.student.findMany({
@@ -493,7 +503,12 @@ export class IndividualLessonsService {
     });
     for (const participant of lesson.participants) {
       const student = students.find((s) => s.id === participant.student.id);
-      if (!student?.parentTelegramChatId) continue;
+      if (!student?.parentTelegramChatId) {
+        this.logger.warn(
+          `У ученика ${participant.student.fullName} не указан parentTelegramChatId — уведомление родителю не отправлено`,
+        );
+        continue;
+      }
       const conflict = studentConflicts.find((c) => c.studentId === student.id);
       const text = [
         parentHeader,

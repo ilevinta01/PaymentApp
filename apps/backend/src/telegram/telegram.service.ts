@@ -13,6 +13,7 @@ export class TelegramService {
 
   // Best-effort: сбой отправки не должен ломать фиксацию оплаты, поэтому исключения гасятся здесь.
   async sendMessage(botToken: string, chatId: string, text: string): Promise<void> {
+    this.logger.log(`Отправка сообщения в Telegram, chatId=${chatId}`);
     try {
       const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
         method: "POST",
@@ -23,6 +24,8 @@ export class TelegramService {
       if (!response.ok) {
         const body = await response.text();
         this.logger.warn(`Telegram API вернул ошибку ${response.status}: ${body}`);
+      } else {
+        this.logger.log(`Сообщение в Telegram доставлено, chatId=${chatId}`);
       }
     } catch (error) {
       this.logger.warn(`Не удалось отправить сообщение в Telegram: ${(error as Error).message}`);
