@@ -17,7 +17,6 @@ import AddStudentPage from "./pages/admin/AddStudentPage";
 import ReportsPage from "./pages/admin/ReportsPage";
 import TeacherEarningsPage from "./pages/admin/TeacherEarningsPage";
 import CashCollectionsPage from "./pages/admin/CashCollectionsPage";
-import GroupsManagePage from "./pages/admin/GroupsPage";
 import StaffPage from "./pages/admin/StaffPage";
 import SettingsPage from "./pages/admin/SettingsPage";
 import PaymentsPage from "./pages/admin/PaymentsPage";
@@ -36,7 +35,6 @@ export default function App() {
         <Route element={<RequireRole allow={[Role.SUPER_ADMIN]} />}>
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminHomePage />} />
-            <Route path="groups/manage" element={<GroupsManagePage />} />
             <Route path="groups/:groupId" element={<GroupDetailPage />} />
             <Route path="groups" element={<GroupsListPage />} />
             <Route path="students/new" element={<AddStudentPage />} />

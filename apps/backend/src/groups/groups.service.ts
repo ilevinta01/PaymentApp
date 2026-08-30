@@ -3,6 +3,7 @@ import { JwtPayload, Role } from "@oplata/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateGroupDto } from "./dto/create-group.dto";
 import { CreateScheduleSlotDto } from "./dto/create-schedule-slot.dto";
+import { SetGroupTeachersDto } from "./dto/set-group-teachers.dto";
 
 export function timeToMinutes(time: string): number {
   const [h, m] = time.split(":").map(Number);
@@ -39,7 +40,7 @@ export class GroupsService {
         tenantId,
         ...(user.role === Role.TEACHER ? { teachers: { some: { id: user.sub } } } : {}),
       },
-      include: { scheduleSlots: true },
+      include: { scheduleSlots: true, teachers: { select: { id: true, fullName: true } } },
       orderBy: { name: "asc" },
     });
     return groups.map((g) => ({ ...g, scheduleSlots: g.scheduleSlots.map(mapSlot) }));
@@ -62,9 +63,38 @@ export class GroupsService {
   }
 
   async remove(tenantId: string, id: string) {
-    const group = await this.prisma.group.findFirst({ where: { id, tenantId } });
+    const group = await this.prisma.group.findFirst({
+      where: { id, tenantId },
+      include: { _count: { select: { students: true } } },
+    });
     if (!group) throw new NotFoundException("Группа не найдена");
+    if (group._count.students > 0) {
+      throw new BadRequestException(
+        "Сначала переведите или удалите всех учеников этой группы — только потом её можно удалить",
+      );
+    }
     await this.prisma.group.delete({ where: { id } });
+    return { success: true };
+  }
+
+  async setTeachers(tenantId: string, groupId: string, dto: SetGroupTeachersDto) {
+    const group = await this.prisma.group.findFirst({ where: { id: groupId, tenantId } });
+    if (!group) throw new NotFoundException("Группа не найдена");
+
+    if (dto.teacherIds.length > 0) {
+      const found = await this.prisma.user.findMany({
+        where: { id: { in: dto.teacherIds }, tenantId, role: Role.TEACHER },
+        select: { id: true },
+      });
+      if (found.length !== dto.teacherIds.length) {
+        throw new BadRequestException("Некоторые преподаватели не найдены");
+      }
+    }
+
+    await this.prisma.group.update({
+      where: { id: groupId },
+      data: { teachers: { set: dto.teacherIds.map((id) => ({ id })) } },
+    });
     return { success: true };
   }
 

@@ -49,6 +49,7 @@ export interface GroupDto {
   name: string;
   monthlyPrice: string;
   scheduleSlots?: GroupScheduleSlotDto[];
+  teachers?: { id: string; fullName: string }[];
 }
 
 export interface ScheduleGroupOccurrenceDto {

@@ -4,6 +4,7 @@ import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { CreateGroupDto } from "./dto/create-group.dto";
 import { CreateScheduleSlotDto } from "./dto/create-schedule-slot.dto";
+import { SetGroupTeachersDto } from "./dto/set-group-teachers.dto";
 import { GroupsService } from "./groups.service";
 
 @Controller("groups")
@@ -31,6 +32,12 @@ export class GroupsController {
   @Delete(":id")
   remove(@CurrentUser() user: JwtPayload, @Param("id") id: string) {
     return this.service.remove(user.tenantId, id);
+  }
+
+  @Roles(Role.SUPER_ADMIN)
+  @Patch(":id/teachers")
+  setTeachers(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Body() dto: SetGroupTeachersDto) {
+    return this.service.setTeachers(user.tenantId, id, dto);
   }
 
   @Roles(Role.SUPER_ADMIN)

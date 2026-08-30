@@ -25,3 +25,13 @@ export async function removeScheduleSlot(slotId: string) {
   const { data } = await apiClient.delete(`/groups/schedule-slots/${slotId}`);
   return data;
 }
+
+export async function setGroupTeachers(groupId: string, teacherIds: string[]) {
+  const { data } = await apiClient.patch(`/groups/${groupId}/teachers`, { teacherIds });
+  return data;
+}
+
+export async function deleteGroup(id: string) {
+  const { data } = await apiClient.delete(`/groups/${id}`);
+  return data;
+}

@@ -69,6 +69,11 @@ export class StudentsService {
     const student = await this.prisma.student.findFirst({ where: { id, tenantId } });
     if (!student) throw new NotFoundException("Ученик не найден");
 
+    if (dto.groupId !== undefined) {
+      const targetGroup = await this.prisma.group.findFirst({ where: { id: dto.groupId, tenantId } });
+      if (!targetGroup) throw new NotFoundException("Группа не найдена");
+    }
+
     return this.prisma.student.update({
       where: { id },
       data: {
