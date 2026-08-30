@@ -31,8 +31,17 @@ function toDateString(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+// "YYYY-MM-DD" через new Date(...) парсится как UTC-полночь, а весь остальной код здесь
+// (getDay/setHours) работает в локальном времени сервера — на машине с часовым поясом
+// западнее UTC это сдвигало день недели на -1 (неделя внезапно начиналась с воскресенья).
+// Разбираем строку вручную, чтобы получить локальную календарную дату без сдвига.
+function parseLocalDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
 function resolveRange(view: ScheduleView, dateParam?: string): { rangeStart: Date; rangeEnd: Date } {
-  const base = dateParam ? new Date(dateParam) : new Date();
+  const base = dateParam ? parseLocalDate(dateParam) : new Date();
   if (Number.isNaN(base.getTime())) throw new BadRequestException("Некорректная дата");
 
   if (view === "day") {

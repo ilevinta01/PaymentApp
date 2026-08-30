@@ -17,12 +17,23 @@ const DEFAULT_HOUR_START = 8;
 const DEFAULT_HOUR_END = 21;
 const HOUR_PX = 56;
 
+// "YYYY-MM-DD" через new Date(...) парсится как UTC-полночь, а весь остальной код здесь
+// (getDay/setDate) работает в локальном времени браузера — при отрицательном смещении от UTC
+// это может сдвинуть день недели на -1. Парсим/форматируем строку вручную, без похода через UTC.
 function toDateStr(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function parseLocalDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d);
 }
 
 function shiftDate(dateStr: string, view: ScheduleView, direction: 1 | -1): string {
-  const d = new Date(dateStr);
+  const d = parseLocalDate(dateStr);
   if (view === "day") d.setDate(d.getDate() + direction);
   else if (view === "week") d.setDate(d.getDate() + 7 * direction);
   else d.setMonth(d.getMonth() + direction);
@@ -30,11 +41,11 @@ function shiftDate(dateStr: string, view: ScheduleView, direction: 1 | -1): stri
 }
 
 function formatDayDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+  return parseLocalDate(dateStr).toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
 }
 
 function addDays(dateStr: string, days: number): string {
-  const d = new Date(dateStr);
+  const d = parseLocalDate(dateStr);
   d.setDate(d.getDate() + days);
   return toDateStr(d);
 }
@@ -220,7 +231,7 @@ export default function SchedulePage() {
     data && view !== "month"
       ? Array.from({ length: view === "day" ? 1 : 7 }, (_, i) => addDays(data.rangeStart, i)).map((d) => ({
           date: d,
-          label: `${DAY_LABELS[(new Date(d).getDay() + 6) % 7]}, ${formatDayDate(d)}`,
+          label: `${DAY_LABELS[(parseLocalDate(d).getDay() + 6) % 7]}, ${formatDayDate(d)}`,
         }))
       : [];
 
@@ -228,7 +239,7 @@ export default function SchedulePage() {
     data && view === "month"
       ? (() => {
           const cells: string[] = [];
-          for (let d = new Date(data.rangeStart); toDateStr(d) < data.rangeEnd; d.setDate(d.getDate() + 1)) {
+          for (let d = parseLocalDate(data.rangeStart); toDateStr(d) < data.rangeEnd; d.setDate(d.getDate() + 1)) {
             cells.push(toDateStr(d));
           }
           return cells;
