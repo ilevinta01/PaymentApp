@@ -25,6 +25,10 @@ export interface TenantSettingsDto {
   isTeacherEarningsEnabled: boolean;
   isIndividualLessonsEnabled: boolean;
   isScheduleEnabled: boolean;
+  isPaymentsReportEnabled: boolean;
+  isDebtorsReportEnabled: boolean;
+  isIndividualDebtorsReportEnabled: boolean;
+  isChangeLogEnabled: boolean;
   telegramBotToken: string | null;
   primaryColor: string | null;
   logoUrl: string | null;
@@ -116,6 +120,58 @@ export interface ReportSummaryDto {
   debtorsCount: number;
 }
 
+export interface DebtorGroupDto {
+  groupId: string;
+  groupName: string;
+  students: StudentDto[];
+}
+
+export interface GroupPaymentEntryDto {
+  id: string;
+  studentName: string;
+  amount: string;
+  paymentMethod: PaymentMethod;
+  dateTime: string;
+}
+
+export interface GroupPaymentsReportDto {
+  groupId: string;
+  groupName: string;
+  totalCollected: string;
+  cashTotal: string;
+  cardTotal: string;
+  paymentsCount: number;
+  payments: GroupPaymentEntryDto[];
+}
+
+export interface IndividualDebtorDto {
+  participantId: string;
+  studentId: string;
+  studentName: string;
+  shareAmount: string;
+  lessonStartAt: string;
+  subject: string | null;
+}
+
+export interface IndividualDebtorsByTeacherDto {
+  teacherId: string;
+  teacherName: string;
+  totalOwed: string;
+  debtors: IndividualDebtorDto[];
+}
+
+export type ChangeLogCategory = "PAYMENT_EDITED" | "INDIVIDUAL_PAID" | "INDIVIDUAL_CANCELLED";
+
+export interface ChangeLogEntryDto {
+  id: string;
+  category: ChangeLogCategory;
+  date: string;
+  actorId: string;
+  actorName: string;
+  studentName: string;
+  description: string;
+}
+
 export interface UserDto {
   id: string;
   email: string;
@@ -161,6 +217,10 @@ export interface TenantSummaryDto {
   isTeacherEarningsEnabled: boolean;
   isIndividualLessonsEnabled: boolean;
   isScheduleEnabled: boolean;
+  isPaymentsReportEnabled: boolean;
+  isDebtorsReportEnabled: boolean;
+  isIndividualDebtorsReportEnabled: boolean;
+  isChangeLogEnabled: boolean;
   owner: { fullName: string; email: string; phone: string | null } | null;
 }
 
@@ -168,12 +228,23 @@ export interface TeacherEarningsDto {
   teacherId: string;
   teacherName: string;
   totalAmount: string;
+  groupTotal: string;
+  individualTotal: string;
+  groups: { groupId: string; groupName: string; amount: string }[];
   payments: {
     id: string;
     studentName: string;
+    groupName: string;
     amount: string;
     paymentMethod: PaymentMethod;
     dateTime: string;
+  }[];
+  individualPayments: {
+    studentName: string;
+    amount: string;
+    paymentMethod: PaymentMethod | null;
+    dateTime: string | null;
+    subject: string | null;
   }[];
 }
 
@@ -218,17 +289,4 @@ export interface IndividualLessonDto {
   // Присутствует только в ответе на создание/изменение: не блокирующие предупреждения
   // о пересечении зала (когда у зала разрешено двойное бронирование).
   warnings?: string[];
-}
-
-export interface PaymentLogDto {
-  id: string;
-  paymentId: string;
-  editDate: string;
-  oldAmount: string;
-  newAmount: string;
-  oldMethod: PaymentMethod;
-  newMethod: PaymentMethod;
-  reason: string;
-  editedBy: { id: string; fullName: string };
-  student: { id: string; fullName: string };
 }

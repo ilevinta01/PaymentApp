@@ -7,8 +7,18 @@ import { getLastMonths } from "../../utils/months";
 
 const LINKS = [
   { to: "/admin/reports/payments", label: "Оплаты (список и редактирование)" },
-  { to: "/admin/reports/debtors", label: "Должники" },
-  { to: "/admin/reports/payment-logs", label: "Реестр изменений" },
+  {
+    to: "/admin/reports/payments-report",
+    label: "Отчёт по оплатам (по группам)",
+    feature: "isPaymentsReportEnabled" as const,
+  },
+  { to: "/admin/reports/debtors", label: "Должники", feature: "isDebtorsReportEnabled" as const },
+  {
+    to: "/admin/reports/individual-debtors",
+    label: "Должники по индивидуальным",
+    feature: "isIndividualDebtorsReportEnabled" as const,
+  },
+  { to: "/admin/reports/change-log", label: "Реестр изменений", feature: "isChangeLogEnabled" as const },
   { to: "/admin/reports/teacher-earnings", label: "По преподавателям", feature: "isTeacherEarningsEnabled" as const },
   { to: "/admin/reports/cash-collections", label: "Касса (инкассация)", feature: "isCashCollectionEnabled" as const },
 ];

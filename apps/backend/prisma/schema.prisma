@@ -48,6 +48,7 @@ model Tenant {
   cashCollections   CashCollection[]
   individualLessons IndividualLesson[]
   rooms             Room[]
+  individualLessonLogs IndividualLessonLog[]
 }
 
 // Физический зал/класс школы. allowDoubleBooking управляет строгостью проверки пересечений:
@@ -80,6 +81,10 @@ model TenantSettings {
   isTeacherEarningsEnabled Boolean @default(false)
   isIndividualLessonsEnabled Boolean @default(false)
   isScheduleEnabled        Boolean @default(false)
+  isPaymentsReportEnabled  Boolean @default(false)
+  isDebtorsReportEnabled   Boolean @default(false)
+  isIndividualDebtorsReportEnabled Boolean @default(false)
+  isChangeLogEnabled       Boolean @default(false)
   telegramBotToken         String?
   primaryColor             String?
   logoUrl                  String?
@@ -123,6 +128,7 @@ model User {
   cashCollectedBy       CashCollection[]     @relation("CashCollectedByAdmin")
   individualLessons     IndividualLesson[]   @relation("IndividualLessonTeacher")
   individualLessonsMade IndividualLesson[]   @relation("IndividualLessonCreatedBy")
+  individualLessonLogsActedBy IndividualLessonLog[] @relation("IndividualLessonLogActor")
 
   @@index([tenantId])
 }
@@ -284,4 +290,25 @@ model PaymentLog {
 
   @@index([tenantId])
   @@index([paymentId])
+}
+
+// Реестр операций по индивидуальным занятиям для "Реестра изменений" — храним снимок данных
+// (имена, а не только id), т.к. само занятие при отмене удаляется и связь потерялась бы.
+// action: "CANCELLED" | "PARTICIPANT_PAID" (обычная строка, не enum — чтобы не тянуть тип
+// из Prisma в shared-пакет, где уже есть похожий гоча с номинальной типизацией enum'ов).
+model IndividualLessonLog {
+  id            String   @id @default(uuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  action        String
+  actorId       String
+  actor         User     @relation("IndividualLessonLogActor", fields: [actorId], references: [id])
+  teacherName   String
+  studentNames  String
+  lessonStartAt DateTime
+  amount        Decimal? @db.Decimal(10, 2)
+  details       String?
+  createdAt     DateTime @default(now())
+
+  @@index([tenantId])
 }

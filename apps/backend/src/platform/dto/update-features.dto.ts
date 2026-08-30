@@ -24,4 +24,20 @@ export class UpdateFeaturesDto {
   @IsOptional()
   @IsBoolean()
   isScheduleEnabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isPaymentsReportEnabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isDebtorsReportEnabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isIndividualDebtorsReportEnabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isChangeLogEnabled?: boolean;
 }

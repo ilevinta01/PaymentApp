@@ -1,7 +1,7 @@
-import { StudentDto } from "@oplata/shared";
+import { DebtorGroupDto } from "@oplata/shared";
 import { apiClient } from "./client";
 
-export async function getDebtors(): Promise<StudentDto[]> {
-  const { data } = await apiClient.get<StudentDto[]>("/debtors");
+export async function getDebtors(): Promise<DebtorGroupDto[]> {
+  const { data } = await apiClient.get<DebtorGroupDto[]>("/debtors");
   return data;
 }

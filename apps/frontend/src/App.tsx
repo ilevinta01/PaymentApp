@@ -20,8 +20,10 @@ import CashCollectionsPage from "./pages/admin/CashCollectionsPage";
 import StaffPage from "./pages/admin/StaffPage";
 import SettingsPage from "./pages/admin/SettingsPage";
 import PaymentsPage from "./pages/admin/PaymentsPage";
+import PaymentsReportPage from "./pages/admin/PaymentsReportPage";
 import DebtorsPage from "./pages/admin/DebtorsPage";
-import PaymentLogsPage from "./pages/admin/PaymentLogsPage";
+import IndividualDebtorsPage from "./pages/admin/IndividualDebtorsPage";
+import ChangeLogPage from "./pages/admin/ChangeLogPage";
 import PlatformPage from "./pages/platform/PlatformPage";
 
 export default function App() {
@@ -44,8 +46,10 @@ export default function App() {
             <Route path="schedule" element={<SchedulePage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="reports/payments" element={<PaymentsPage />} />
+            <Route path="reports/payments-report" element={<PaymentsReportPage />} />
             <Route path="reports/debtors" element={<DebtorsPage />} />
-            <Route path="reports/payment-logs" element={<PaymentLogsPage />} />
+            <Route path="reports/individual-debtors" element={<IndividualDebtorsPage />} />
+            <Route path="reports/change-log" element={<ChangeLogPage />} />
             <Route path="reports/teacher-earnings" element={<TeacherEarningsPage />} />
             <Route path="reports/cash-collections" element={<CashCollectionsPage />} />
             <Route path="staff" element={<StaffPage />} />

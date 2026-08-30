@@ -36,4 +36,19 @@ export class DebtorsService {
       return !isOnHold;
     });
   }
+
+  async getDebtorsByGroup(tenantId: string) {
+    const debtors = await this.getDebtors(tenantId);
+
+    const byGroup = new Map<string, { groupId: string; groupName: string; students: typeof debtors }>();
+    for (const student of debtors) {
+      const key = student.group.id;
+      if (!byGroup.has(key)) {
+        byGroup.set(key, { groupId: key, groupName: student.group.name, students: [] });
+      }
+      byGroup.get(key)!.students.push(student);
+    }
+
+    return Array.from(byGroup.values()).sort((a, b) => a.groupName.localeCompare(b.groupName));
+  }
 }

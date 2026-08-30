@@ -32,6 +32,10 @@ export class PlatformService {
             isTeacherEarningsEnabled: true,
             isIndividualLessonsEnabled: true,
             isScheduleEnabled: true,
+            isPaymentsReportEnabled: true,
+            isDebtorsReportEnabled: true,
+            isIndividualDebtorsReportEnabled: true,
+            isChangeLogEnabled: true,
           },
         },
         _count: { select: { users: true, students: true } },
@@ -64,6 +68,10 @@ export class PlatformService {
       isTeacherEarningsEnabled: tenant.settings?.isTeacherEarningsEnabled ?? false,
       isIndividualLessonsEnabled: tenant.settings?.isIndividualLessonsEnabled ?? false,
       isScheduleEnabled: tenant.settings?.isScheduleEnabled ?? false,
+      isPaymentsReportEnabled: tenant.settings?.isPaymentsReportEnabled ?? false,
+      isDebtorsReportEnabled: tenant.settings?.isDebtorsReportEnabled ?? false,
+      isIndividualDebtorsReportEnabled: tenant.settings?.isIndividualDebtorsReportEnabled ?? false,
+      isChangeLogEnabled: tenant.settings?.isChangeLogEnabled ?? false,
       owner: tenant.users[0] ?? null,
     }));
   }

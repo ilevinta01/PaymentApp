@@ -14,7 +14,6 @@ import { GroupsModule } from "./groups/groups.module";
 import { StudentsModule } from "./students/students.module";
 import { PaymentsModule } from "./payments/payments.module";
 import { DebtorsModule } from "./debtors/debtors.module";
-import { PaymentLogsModule } from "./payment-logs/payment-logs.module";
 import { PlatformModule } from "./platform/platform.module";
 import { ReportsModule } from "./reports/reports.module";
 import { CashCollectionsModule } from "./cash-collections/cash-collections.module";
@@ -35,7 +34,6 @@ import { HealthModule } from "./health/health.module";
     StudentsModule,
     PaymentsModule,
     DebtorsModule,
-    PaymentLogsModule,
     PlatformModule,
     ReportsModule,
     CashCollectionsModule,

@@ -317,6 +317,18 @@ export class IndividualLessonsService {
       this.prisma.individualLesson.delete({ where: { id: lessonId } }),
     ]);
 
+    await this.prisma.individualLessonLog.create({
+      data: {
+        tenantId,
+        action: "CANCELLED",
+        actorId: user.sub,
+        teacherName: lesson.teacher.fullName,
+        studentNames: lesson.participants.map((p) => p.student.fullName).join(", "),
+        lessonStartAt: lesson.startAt,
+        amount: lesson.totalPrice,
+      },
+    });
+
     await this.sendCancellationNotifications(tenantId, lesson, user.role);
 
     return { success: true };
@@ -345,6 +357,19 @@ export class IndividualLessonsService {
     const updated = await this.prisma.individualLessonParticipant.update({
       where: { id: participantId },
       data: { isPaid: true, paymentMethod: dto.paymentMethod, paidAt: new Date() },
+    });
+
+    await this.prisma.individualLessonLog.create({
+      data: {
+        tenantId,
+        action: "PARTICIPANT_PAID",
+        actorId: user.sub,
+        teacherName: participant.individualLesson.teacher.fullName,
+        studentNames: participant.student.fullName,
+        lessonStartAt: participant.individualLesson.startAt,
+        amount: participant.shareAmount,
+        details: `Способ: ${METHOD_LABEL[dto.paymentMethod]}`,
+      },
     });
 
     if (settings?.isTelegramEnabled && settings.telegramBotToken && participant.student.parentTelegramChatId) {

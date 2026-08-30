@@ -4,7 +4,11 @@ export type FeatureKey =
   | "isCashCollectionEnabled"
   | "isTeacherEarningsEnabled"
   | "isIndividualLessonsEnabled"
-  | "isScheduleEnabled";
+  | "isScheduleEnabled"
+  | "isPaymentsReportEnabled"
+  | "isDebtorsReportEnabled"
+  | "isIndividualDebtorsReportEnabled"
+  | "isChangeLogEnabled";
 
 export interface FeatureDefinition {
   key: FeatureKey;
@@ -46,6 +50,27 @@ export const FEATURE_DEFINITIONS: FeatureDefinition[] = [
     label: "Расписание",
     description:
       "Еженедельное расписание групп у администратора и просмотр своего расписания преподавателем по неделям (включая индивидуальные занятия).",
+  },
+  {
+    key: "isPaymentsReportEnabled",
+    label: "Отчёт по оплатам",
+    description: "Визуализация собранных оплат по группам за период и выгрузка отчёта в Excel по группам.",
+  },
+  {
+    key: "isDebtorsReportEnabled",
+    label: "Отчёт по должникам",
+    description: "Список должников по групповым занятиям, сгруппированный по группам.",
+  },
+  {
+    key: "isIndividualDebtorsReportEnabled",
+    label: "Должники по индивидуальным занятиям",
+    description: "Отдельный отчёт о неоплаченных индивидуальных занятиях, сгруппированный по преподавателям.",
+  },
+  {
+    key: "isChangeLogEnabled",
+    label: "Реестр изменений",
+    description:
+      "Журнал операций (оплаты, изменения оплат, отмены индивидуальных занятий) с указанием, кто и когда внёс изменение.",
   },
 ];
 
