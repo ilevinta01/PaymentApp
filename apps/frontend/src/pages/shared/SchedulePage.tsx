@@ -10,7 +10,7 @@ import { getTenantSettings } from "../../api/tenantSettings";
 import { useAuthStore } from "../../store/auth.store";
 import { useBasePath } from "../../hooks/useBasePath";
 
-const DAY_LABELS = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"];
+const DAY_LABELS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 const MODE_LABELS: Record<ScheduleMode, string> = { teacher: "Преподаватель", student: "Ученик", room: "Зал" };
 const VIEW_LABELS: Record<ScheduleView, string> = { day: "День", week: "Неделя", month: "Месяц" };
 const DEFAULT_HOUR_START = 8;
@@ -76,20 +76,20 @@ function TimeGrid({
 
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-      <div className="flex" style={{ minWidth: days.length > 1 ? days.length * 150 + 44 : 260 }}>
-        <div className="w-11 shrink-0 border-r border-slate-100">
+      <div className="flex w-full" style={{ minWidth: days.length > 1 ? days.length * 44 + 44 : 260 }}>
+        <div className="w-9 shrink-0 border-r border-slate-100 sm:w-11">
           <div className="h-8 border-b border-slate-100" />
           {hours.map((h) => (
             <div key={h} style={{ height: HOUR_PX }} className="relative">
-              <span className="absolute -top-2 right-1 text-[11px] text-slate-400">{h}:00</span>
+              <span className="absolute -top-2 right-1 text-[10px] text-slate-400 sm:text-[11px]">{h}:00</span>
             </div>
           ))}
         </div>
         {days.map((day) => {
           const dayItems = items.filter((it) => it.date === day.date);
           return (
-            <div key={day.date} className="relative min-w-[150px] flex-1 border-r border-slate-100 last:border-r-0">
-              <div className="flex h-8 items-center justify-center border-b border-slate-100 text-xs font-semibold text-slate-700">
+            <div key={day.date} className="relative min-w-0 flex-1 border-r border-slate-100 last:border-r-0">
+              <div className="flex h-8 items-center justify-center truncate border-b border-slate-100 px-0.5 text-xs font-semibold text-slate-700">
                 {day.label}
               </div>
               <div className="relative" style={{ height: gridHeight }}>
@@ -113,7 +113,7 @@ function TimeGrid({
                       type="button"
                       onClick={item.onClick}
                       disabled={!item.onClick}
-                      className="h-full w-full overflow-hidden rounded px-1 text-left text-[11px] leading-tight text-white shadow-sm"
+                      className="h-full w-full overflow-hidden truncate whitespace-nowrap rounded px-1 text-left text-[11px] leading-tight text-white shadow-sm"
                       style={{ background: item.color, cursor: item.onClick ? "pointer" : "default" }}
                     >
                       {item.title}
