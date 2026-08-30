@@ -4,6 +4,7 @@ import { PaymentMethod, Role, StudentDto } from "@oplata/shared";
 import { getStudents } from "../../api/students";
 import { getGroups } from "../../api/groups";
 import { createPayment } from "../../api/payments";
+import { getIndividualLessonsForStudent, markIndividualLessonParticipantPaid } from "../../api/individualLessons";
 import { getTenantSettings } from "../../api/tenantSettings";
 import { useAuthStore } from "../../store/auth.store";
 
@@ -26,6 +27,73 @@ function StudentRow({ student, onSelect }: { student: StudentDto; onSelect: () =
         </span>
       </button>
     </li>
+  );
+}
+
+function IndividualLessonsSection({ studentId, isCardEnabled }: { studentId: string; isCardEnabled: boolean }) {
+  const queryClient = useQueryClient();
+  const { data: lessons } = useQuery({
+    queryKey: ["individual-lessons-for-student", studentId],
+    queryFn: () => getIndividualLessonsForStudent(studentId),
+  });
+
+  const payMutation = useMutation({
+    mutationFn: ({ participantId, method }: { participantId: string; method: PaymentMethod }) =>
+      markIndividualLessonParticipantPaid(participantId, method),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["individual-lessons-for-student", studentId] });
+    },
+  });
+
+  const unpaid = lessons?.filter((p) => !p.isPaid) ?? [];
+  if (lessons && unpaid.length === 0) return null;
+
+  return (
+    <div className="space-y-2 border-t border-slate-100 pt-3">
+      <p className="text-sm font-medium text-slate-700">Неоплаченные индивидуальные занятия</p>
+      <ul className="space-y-2">
+        {unpaid.map((p) => {
+          const isUpcoming = new Date(p.individualLesson.startAt) > new Date();
+          return (
+            <li key={p.id} className="rounded-lg bg-slate-50 p-3 text-sm">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-slate-800">
+                    {new Date(p.individualLesson.startAt).toLocaleString("ru-RU")}
+                    {p.individualLesson.subject ? ` · ${p.individualLesson.subject}` : ""}
+                  </p>
+                  <p className="text-slate-500">
+                    {p.individualLesson.teacherName} ·{" "}
+                    <span className={isUpcoming ? "text-amber-600" : "text-slate-500"}>
+                      {isUpcoming ? "предстоит" : "прошло"}
+                    </span>{" "}
+                    · {p.shareAmount}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-2 flex gap-2">
+                <button
+                  onClick={() => payMutation.mutate({ participantId: p.id, method: PaymentMethod.CASH })}
+                  disabled={payMutation.isPending}
+                  className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-600"
+                >
+                  Наличные
+                </button>
+                {isCardEnabled && (
+                  <button
+                    onClick={() => payMutation.mutate({ participantId: p.id, method: PaymentMethod.CARD })}
+                    disabled={payMutation.isPending}
+                    className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-600"
+                  >
+                    Карта
+                  </button>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 
@@ -105,6 +173,10 @@ function PaymentForm({ student, onDone }: { student: StudentDto; onDone: () => v
 
       {mutation.isSuccess && (
         <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">Оплата записана. Можно выбрать следующего ученика.</p>
+      )}
+
+      {settings?.isIndividualLessonsEnabled && (
+        <IndividualLessonsSection studentId={student.id} isCardEnabled={!!settings?.isCardEnabled} />
       )}
     </div>
   );
