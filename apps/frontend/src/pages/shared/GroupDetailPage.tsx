@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Role, StudentStatus } from "@oplata/shared";
 import { deleteGroup, getGroups, setGroupTeachers, updateGroup } from "../../api/groups";
-import { getStudents, updateStudent } from "../../api/students";
+import { deleteStudent, getStudents, updateStudent } from "../../api/students";
 import { getStaff } from "../../api/users";
 import { useBasePath } from "../../hooks/useBasePath";
 import { useAuthStore } from "../../store/auth.store";
@@ -91,6 +91,11 @@ function StudentRow({
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteStudent(student.id),
+    onSuccess: onChanged,
+  });
+
   return (
     <li className="px-4 py-3">
       <div className="flex items-center justify-between gap-2">
@@ -111,6 +116,15 @@ function StudentRow({
         )}
         <button onClick={() => setMoving((v) => !v)} className="text-sm font-medium text-[var(--brand-primary)]">
           Перевести
+        </button>
+        <button
+          onClick={() => {
+            if (confirm(`Удалить ученика «${student.fullName}»? Это действие необратимо.`)) deleteMutation.mutate();
+          }}
+          disabled={deleteMutation.isPending}
+          className="text-sm font-medium text-red-600"
+        >
+          Удалить
         </button>
       </div>
       {moving && (
@@ -139,6 +153,12 @@ function StudentRow({
         </div>
       )}
       {moveMutation.isError && <p className="mt-1 text-sm text-red-600">Не удалось перевести ученика.</p>}
+      {deleteMutation.isError && (
+        <p className="mt-1 text-sm text-red-600">
+          {(deleteMutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+            "Не удалось удалить ученика."}
+        </p>
+      )}
     </li>
   );
 }

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { JwtPayload, Role } from "@oplata/shared";
 import { getCurrentPeriodMonth } from "../common/period";
 import { PrismaService } from "../prisma/prisma.service";
@@ -105,8 +105,16 @@ export class StudentsService {
   }
 
   async remove(tenantId: string, id: string) {
-    const student = await this.prisma.student.findFirst({ where: { id, tenantId } });
+    const student = await this.prisma.student.findFirst({
+      where: { id, tenantId },
+      include: { _count: { select: { payments: true, individualLessonShares: true } } },
+    });
     if (!student) throw new NotFoundException("Ученик не найден");
+    if (student._count.payments > 0 || student._count.individualLessonShares > 0) {
+      throw new BadRequestException(
+        "У ученика есть история оплат — удалить его нельзя, чтобы не потерять финансовые записи. Переведите его в архивную группу или переведите в другую группу вместо удаления.",
+      );
+    }
     await this.prisma.student.delete({ where: { id } });
     return { success: true };
   }

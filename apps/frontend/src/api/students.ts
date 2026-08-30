@@ -35,3 +35,8 @@ export async function updateStudentStatus(id: string, payload: { status: Student
   const { data } = await apiClient.patch<StudentDto>(`/students/${id}/status`, payload);
   return data;
 }
+
+export async function deleteStudent(id: string) {
+  const { data } = await apiClient.delete(`/students/${id}`);
+  return data;
+}
