@@ -131,6 +131,7 @@ model User {
   individualLessonsMade IndividualLesson[]   @relation("IndividualLessonCreatedBy")
   individualLessonLogsActedBy IndividualLessonLog[] @relation("IndividualLessonLogActor")
   balanceTransactionsCreated  BalanceTransaction[]  @relation("BalanceTransactionCreatedBy")
+  individualLessonPaymentsCollected IndividualLessonParticipant[] @relation("IndividualLessonParticipantPaidBy")
 
   @@index([tenantId])
 }
@@ -282,6 +283,11 @@ model IndividualLessonParticipant {
   // Оплачено списанием с баланса (аванса) ученика, а не наличными/картой в моменте —
   // исключается из "заработано" в отчётах по преподавателям, чтобы не задваивать выручку.
   paidFromBalance    Boolean          @default(false)
+  // Кто фактически провёл оплату (мог быть админ через общий экран "Оплата", а не сам
+  // преподаватель занятия) — отчёт "По преподавателям" должен приписывать деньги именно
+  // этому человеку, а не тому, кто ведёт занятие.
+  paidById           String?
+  paidBy             User?            @relation("IndividualLessonParticipantPaidBy", fields: [paidById], references: [id])
 
   @@index([individualLessonId])
   @@index([studentId])

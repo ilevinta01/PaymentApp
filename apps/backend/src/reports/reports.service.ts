@@ -324,6 +324,7 @@ export class ReportsService {
         },
         include: {
           student: { select: { fullName: true } },
+          paidBy: { select: { id: true, fullName: true } },
           individualLesson: { include: { teacher: { select: { id: true, fullName: true } } } },
         },
         orderBy: { paidAt: "desc" },
@@ -396,8 +397,12 @@ export class ReportsService {
     }
 
     for (const p of individualParticipants) {
-      const teacher = p.individualLesson.teacher;
-      const entry = ensure(teacher.id, teacher.fullName);
+      // Деньги приписываем тому, кто ФАКТИЧЕСКИ провёл оплату (мог быть админ через общий
+      // экран "Оплата"), а не тому, кто ведёт занятие — это разные люди. paidBy отсутствует
+      // только у записей, оплаченных до появления этого поля — для них используем учителя
+      // занятия как единственный доступный ориентир.
+      const collector = p.paidBy ?? p.individualLesson.teacher;
+      const entry = ensure(collector.id, collector.fullName);
       entry.individualTotal += Number(p.shareAmount);
       entry.individualPayments.push({
         studentName: p.student.fullName,

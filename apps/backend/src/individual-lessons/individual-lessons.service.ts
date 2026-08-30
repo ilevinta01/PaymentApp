@@ -371,8 +371,8 @@ export class IndividualLessonsService {
       this.prisma.individualLessonParticipant.update({
         where: { id: participantId },
         data: dto.fromBalance
-          ? { isPaid: true, paidFromBalance: true, paidAt: new Date() }
-          : { isPaid: true, paymentMethod: dto.paymentMethod, paidAt: new Date() },
+          ? { isPaid: true, paidFromBalance: true, paidById: user.sub, paidAt: new Date() }
+          : { isPaid: true, paymentMethod: dto.paymentMethod, paidById: user.sub, paidAt: new Date() },
       }),
       ...(dto.fromBalance
         ? [
