@@ -47,6 +47,24 @@ model Tenant {
   paymentLogs       PaymentLog[]
   cashCollections   CashCollection[]
   individualLessons IndividualLesson[]
+  rooms             Room[]
+}
+
+// Физический зал/класс школы. allowDoubleBooking управляет строгостью проверки пересечений:
+// true (по умолчанию) — система лишь предупреждает о пересечении, решение за пользователем;
+// false — админ явно запретил занимать зал одновременно, тогда пересечение блокируется.
+model Room {
+  id                 String   @id @default(uuid())
+  tenantId           String
+  tenant             Tenant   @relation(fields: [tenantId], references: [id])
+  name               String
+  allowDoubleBooking Boolean  @default(true)
+  createdAt          DateTime @default(now())
+
+  scheduleSlots     GroupScheduleSlot[]
+  individualLessons IndividualLesson[]
+
+  @@index([tenantId])
 }
 
 model TenantSettings {
@@ -123,14 +141,17 @@ model Group {
 // dayOfWeek: 0 = воскресенье .. 6 = суббота (как Date.getDay() в JS).
 // startMinutes/endMinutes — минуты от полуночи, чтобы легко сравнивать пересечения.
 model GroupScheduleSlot {
-  id           String @id @default(uuid())
+  id           String  @id @default(uuid())
   groupId      String
-  group        Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  group        Group   @relation(fields: [groupId], references: [id], onDelete: Cascade)
   dayOfWeek    Int
   startMinutes Int
   endMinutes   Int
+  roomId       String?
+  room         Room?   @relation(fields: [roomId], references: [id])
 
   @@index([groupId])
+  @@index([roomId])
 }
 
 model Student {
@@ -209,11 +230,14 @@ model IndividualLesson {
   createdById       String
   createdBy         User     @relation("IndividualLessonCreatedBy", fields: [createdById], references: [id])
   createdAt         DateTime @default(now())
+  roomId            String?
+  room              Room?    @relation(fields: [roomId], references: [id])
 
   participants IndividualLessonParticipant[]
 
   @@index([tenantId])
   @@index([teacherId])
+  @@index([roomId])
 }
 
 model IndividualLessonParticipant {

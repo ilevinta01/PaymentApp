@@ -10,6 +10,7 @@ import {
 import { getStaff } from "../../api/users";
 import { getStudents } from "../../api/students";
 import { getTenantSettings } from "../../api/tenantSettings";
+import { getRooms } from "../../api/rooms";
 import { useAuthStore } from "../../store/auth.store";
 
 function formatDateTime(iso: string) {
@@ -27,10 +28,11 @@ function getErrorMessage(error: unknown, fallback: string): string {
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
 const MINUTES = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, "0"));
 
-function CreateLessonForm({ onCreated }: { onCreated: () => void }) {
+function CreateLessonForm({ onCreated, showRooms }: { onCreated: () => void; showRooms: boolean }) {
   const isAdmin = useAuthStore((s) => s.user?.role) === Role.SUPER_ADMIN;
   const { data: staff } = useQuery({ queryKey: ["staff"], queryFn: getStaff, enabled: isAdmin });
   const teachers = staff?.filter((s) => s.role === Role.TEACHER) ?? [];
+  const { data: rooms } = useQuery({ queryKey: ["rooms"], queryFn: getRooms, enabled: showRooms });
 
   const [teacherId, setTeacherId] = useState("");
   const [studentQuery, setStudentQuery] = useState("");
@@ -39,6 +41,8 @@ function CreateLessonForm({ onCreated }: { onCreated: () => void }) {
   const [hour, setHour] = useState("");
   const [minute, setMinute] = useState("");
   const [durationMinutes, setDurationMinutes] = useState(60);
+  const [roomId, setRoomId] = useState("");
+  const [warnings, setWarnings] = useState<string[]>([]);
 
   const trimmedQuery = studentQuery.trim();
   const { data: foundStudents } = useQuery({
@@ -54,15 +58,18 @@ function CreateLessonForm({ onCreated }: { onCreated: () => void }) {
         studentIds: selectedStudents.map((s) => s.id),
         startAt: new Date(`${date}T${hour}:${minute}`).toISOString(),
         durationMinutes,
+        roomId: roomId || undefined,
       }),
-    onSuccess: () => {
+    onSuccess: (result) => {
       onCreated();
+      setWarnings(result.warnings ?? []);
       setTeacherId("");
       setSelectedStudents([]);
       setDate("");
       setHour("");
       setMinute("");
       setDurationMinutes(60);
+      setRoomId("");
     },
   });
 
@@ -186,6 +193,21 @@ function CreateLessonForm({ onCreated }: { onCreated: () => void }) {
         <span className="self-center text-sm text-slate-500">мин</span>
       </div>
 
+      {showRooms && rooms && rooms.length > 0 && (
+        <select
+          value={roomId}
+          onChange={(e) => setRoomId(e.target.value)}
+          className="w-full rounded-lg border border-slate-300 px-3 py-2"
+        >
+          <option value="">Без зала</option>
+          {rooms.map((room) => (
+            <option key={room.id} value={room.id}>
+              {room.name}
+            </option>
+          ))}
+        </select>
+      )}
+
       <p className="text-xs text-slate-400">
         Стоимость рассчитается автоматически (ставка преподавателя × длительность) и поровну разделится между
         выбранными учениками. Учитель и родители получат уведомление в Telegram, если оно подключено.
@@ -200,24 +222,47 @@ function CreateLessonForm({ onCreated }: { onCreated: () => void }) {
       {mutation.isError && (
         <p className="text-sm text-red-600">{getErrorMessage(mutation.error, "Не удалось создать занятие.")}</p>
       )}
+      {warnings.length > 0 && (
+        <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+          {warnings.map((w) => (
+            <p key={w}>⚠ {w}</p>
+          ))}
+        </div>
+      )}
     </form>
   );
 }
 
-function EditLessonForm({ lesson, onDone }: { lesson: IndividualLessonDto; onDone: () => void }) {
+function EditLessonForm({
+  lesson,
+  showRooms,
+  onDone,
+  onWarnings,
+}: {
+  lesson: IndividualLessonDto;
+  showRooms: boolean;
+  onDone: () => void;
+  onWarnings: (warnings: string[]) => void;
+}) {
   const start = new Date(lesson.startAt);
   const [date, setDate] = useState(start.toISOString().slice(0, 10));
   const [hour, setHour] = useState(String(start.getHours()).padStart(2, "0"));
   const [minute, setMinute] = useState(String(Math.floor(start.getMinutes() / 5) * 5).padStart(2, "0"));
   const [durationMinutes, setDurationMinutes] = useState(lesson.durationMinutes);
+  const [roomId, setRoomId] = useState(lesson.roomId ?? "");
+  const { data: rooms } = useQuery({ queryKey: ["rooms"], queryFn: getRooms, enabled: showRooms });
 
   const mutation = useMutation({
     mutationFn: () =>
       updateIndividualLesson(lesson.id, {
         startAt: new Date(`${date}T${hour}:${minute}`).toISOString(),
         durationMinutes,
+        roomId,
       }),
-    onSuccess: onDone,
+    onSuccess: (result) => {
+      onWarnings(result.warnings ?? []);
+      onDone();
+    },
   });
 
   return (
@@ -261,6 +306,20 @@ function EditLessonForm({ lesson, onDone }: { lesson: IndividualLessonDto; onDon
         />
         <span className="self-center text-sm text-slate-500">мин</span>
       </div>
+      {showRooms && rooms && rooms.length > 0 && (
+        <select
+          value={roomId}
+          onChange={(e) => setRoomId(e.target.value)}
+          className="w-full rounded-lg border border-slate-300 px-3 py-2"
+        >
+          <option value="">Без зала</option>
+          {rooms.map((room) => (
+            <option key={room.id} value={room.id}>
+              {room.name}
+            </option>
+          ))}
+        </select>
+      )}
       <div className="flex gap-2">
         <button
           onClick={() => mutation.mutate()}
@@ -284,13 +343,17 @@ function LessonRow({
   lesson,
   canEdit,
   isCardEnabled,
+  showRooms,
   onChanged,
+  onWarnings,
   payMutation,
 }: {
   lesson: IndividualLessonDto;
   canEdit: boolean;
   isCardEnabled: boolean;
+  showRooms: boolean;
   onChanged: () => void;
+  onWarnings: (warnings: string[]) => void;
   payMutation: ReturnType<typeof useMutation<unknown, Error, { participantId: string; method: PaymentMethod }>>;
 }) {
   const [editing, setEditing] = useState(false);
@@ -302,6 +365,7 @@ function LessonRow({
           <p className="font-medium text-slate-800">{formatDateTime(lesson.startAt)}</p>
           <p className="text-sm text-slate-500">
             {lesson.teacherName} · {lesson.durationMinutes} мин · {lesson.totalPrice}
+            {lesson.roomName ? ` · ${lesson.roomName}` : ""}
           </p>
         </div>
         {canEdit && !editing && (
@@ -314,6 +378,8 @@ function LessonRow({
       {editing && (
         <EditLessonForm
           lesson={lesson}
+          showRooms={showRooms}
+          onWarnings={onWarnings}
           onDone={() => {
             setEditing(false);
             onChanged();
@@ -362,6 +428,7 @@ export default function IndividualLessonsPage() {
   const isAdmin = currentUser?.role === Role.SUPER_ADMIN;
   const { data: lessons, isLoading } = useQuery({ queryKey: ["individual-lessons"], queryFn: getIndividualLessons });
   const { data: settings } = useQuery({ queryKey: ["tenant-settings"], queryFn: getTenantSettings });
+  const [warnings, setWarnings] = useState<string[]>([]);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["individual-lessons"] });
 
@@ -374,7 +441,14 @@ export default function IndividualLessonsPage() {
   return (
     <div className="space-y-6">
       <h2 className="text-lg font-semibold text-slate-900">Индивидуальные занятия</h2>
-      <CreateLessonForm onCreated={invalidate} />
+      {warnings.length > 0 && (
+        <div className="space-y-1 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+          {warnings.map((w) => (
+            <p key={w}>⚠ {w}</p>
+          ))}
+        </div>
+      )}
+      <CreateLessonForm onCreated={invalidate} showRooms={!!settings?.isScheduleEnabled} />
 
       {isLoading && <p className="text-slate-500">Загрузка…</p>}
       <ul className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
@@ -384,7 +458,9 @@ export default function IndividualLessonsPage() {
             lesson={lesson}
             canEdit={isAdmin || lesson.teacherId === currentUser?.id}
             isCardEnabled={!!settings?.isCardEnabled}
+            showRooms={!!settings?.isScheduleEnabled}
             onChanged={invalidate}
+            onWarnings={setWarnings}
             payMutation={payMutation}
           />
         ))}

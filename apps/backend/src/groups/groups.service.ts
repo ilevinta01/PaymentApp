@@ -19,13 +19,23 @@ export function minutesToTime(minutes: number): string {
   return `${h}:${m}`;
 }
 
-function mapSlot(slot: { id: string; groupId: string; dayOfWeek: number; startMinutes: number; endMinutes: number }) {
+function mapSlot(slot: {
+  id: string;
+  groupId: string;
+  dayOfWeek: number;
+  startMinutes: number;
+  endMinutes: number;
+  roomId: string | null;
+  room?: { name: string } | null;
+}) {
   return {
     id: slot.id,
     groupId: slot.groupId,
     dayOfWeek: slot.dayOfWeek,
     startTime: minutesToTime(slot.startMinutes),
     endTime: minutesToTime(slot.endMinutes),
+    roomId: slot.roomId,
+    roomName: slot.room?.name ?? null,
   };
 }
 
@@ -41,7 +51,10 @@ export class GroupsService {
         tenantId,
         ...(user.role === Role.TEACHER ? { teachers: { some: { id: user.sub } } } : {}),
       },
-      include: { scheduleSlots: true, teachers: { select: { id: true, fullName: true } } },
+      include: {
+        scheduleSlots: { include: { room: { select: { name: true } } } },
+        teachers: { select: { id: true, fullName: true } },
+      },
       orderBy: { name: "asc" },
     });
     return groups.map((g) => ({ ...g, scheduleSlots: g.scheduleSlots.map(mapSlot) }));
@@ -99,6 +112,14 @@ export class GroupsService {
     return { success: true };
   }
 
+  private async resolveRoomId(tenantId: string, roomId: string | undefined): Promise<string | null | undefined> {
+    if (roomId === undefined) return undefined;
+    if (!roomId) return null;
+    const room = await this.prisma.room.findFirst({ where: { id: roomId, tenantId } });
+    if (!room) throw new NotFoundException("Зал не найден");
+    return roomId;
+  }
+
   async addScheduleSlot(tenantId: string, groupId: string, dto: CreateScheduleSlotDto) {
     const group = await this.prisma.group.findFirst({ where: { id: groupId, tenantId } });
     if (!group) throw new NotFoundException("Группа не найдена");
@@ -109,8 +130,11 @@ export class GroupsService {
       throw new BadRequestException("Время окончания должно быть позже времени начала");
     }
 
+    const roomId = await this.resolveRoomId(tenantId, dto.roomId);
+
     const slot = await this.prisma.groupScheduleSlot.create({
-      data: { groupId, dayOfWeek: dto.dayOfWeek, startMinutes, endMinutes },
+      data: { groupId, dayOfWeek: dto.dayOfWeek, startMinutes, endMinutes, roomId: roomId || null },
+      include: { room: { select: { name: true } } },
     });
     return mapSlot(slot);
   }
@@ -125,9 +149,12 @@ export class GroupsService {
       throw new BadRequestException("Время окончания должно быть позже времени начала");
     }
 
+    const roomId = await this.resolveRoomId(tenantId, dto.roomId);
+
     const updated = await this.prisma.groupScheduleSlot.update({
       where: { id: slotId },
-      data: { startMinutes, endMinutes },
+      data: { startMinutes, endMinutes, ...(roomId !== undefined ? { roomId } : {}) },
+      include: { room: { select: { name: true } } },
     });
     return mapSlot(updated);
   }

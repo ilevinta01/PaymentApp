@@ -1,4 +1,4 @@
-import { IsDateString, IsInt, IsOptional, Min } from "class-validator";
+import { IsDateString, IsInt, IsOptional, IsString, Min } from "class-validator";
 
 export class UpdateIndividualLessonDto {
   @IsOptional()
@@ -9,4 +9,9 @@ export class UpdateIndividualLessonDto {
   @IsInt()
   @Min(5)
   durationMinutes?: number;
+
+  // Пустая строка означает "убрать зал".
+  @IsOptional()
+  @IsString()
+  roomId?: string;
 }

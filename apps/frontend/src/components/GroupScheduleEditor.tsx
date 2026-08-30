@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { GroupDto } from "@oplata/shared";
 import { addScheduleSlot, removeScheduleSlot, updateScheduleSlot } from "../api/groups";
+import { getRooms } from "../api/rooms";
 
 const DAY_LABELS = ["Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"];
 // Отображаем неделю с понедельника — привычнее для восприятия, чем начиная с воскресенья,
@@ -12,6 +13,7 @@ interface DayState {
   checked: boolean;
   startTime: string;
   endTime: string;
+  roomId: string;
   slotId?: string;
 }
 
@@ -20,14 +22,15 @@ function buildInitialState(group: GroupDto): Record<number, DayState> {
   for (let day = 0; day < 7; day++) {
     const slot = group.scheduleSlots?.find((s) => s.dayOfWeek === day);
     state[day] = slot
-      ? { checked: true, startTime: slot.startTime, endTime: slot.endTime, slotId: slot.id }
-      : { checked: false, startTime: "15:00", endTime: "16:00" };
+      ? { checked: true, startTime: slot.startTime, endTime: slot.endTime, roomId: slot.roomId ?? "", slotId: slot.id }
+      : { checked: false, startTime: "15:00", endTime: "16:00", roomId: "" };
   }
   return state;
 }
 
 export default function GroupScheduleEditor({ group, onChanged }: { group: GroupDto; onChanged: () => void }) {
   const [days, setDays] = useState<Record<number, DayState>>(() => buildInitialState(group));
+  const { data: rooms } = useQuery({ queryKey: ["rooms"], queryFn: getRooms });
 
   useEffect(() => {
     setDays(buildInitialState(group));
@@ -38,9 +41,18 @@ export default function GroupScheduleEditor({ group, onChanged }: { group: Group
       const jobs = DISPLAY_ORDER.map(async (day) => {
         const state = days[day];
         if (state.checked && !state.slotId) {
-          await addScheduleSlot(group.id, { dayOfWeek: day, startTime: state.startTime, endTime: state.endTime });
+          await addScheduleSlot(group.id, {
+            dayOfWeek: day,
+            startTime: state.startTime,
+            endTime: state.endTime,
+            roomId: state.roomId || undefined,
+          });
         } else if (state.checked && state.slotId) {
-          await updateScheduleSlot(state.slotId, { startTime: state.startTime, endTime: state.endTime });
+          await updateScheduleSlot(state.slotId, {
+            startTime: state.startTime,
+            endTime: state.endTime,
+            roomId: state.roomId,
+          });
         } else if (!state.checked && state.slotId) {
           await removeScheduleSlot(state.slotId);
         }
@@ -72,7 +84,7 @@ export default function GroupScheduleEditor({ group, onChanged }: { group: Group
                 {DAY_LABELS[day]}
               </label>
               {state.checked && (
-                <div className="ml-6 flex items-center gap-2">
+                <div className="ml-6 flex flex-wrap items-center gap-2">
                   <input
                     type="time"
                     value={state.startTime}
@@ -86,6 +98,20 @@ export default function GroupScheduleEditor({ group, onChanged }: { group: Group
                     onChange={(e) => setDay(day, { endTime: e.target.value })}
                     className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
                   />
+                  {rooms && rooms.length > 0 && (
+                    <select
+                      value={state.roomId}
+                      onChange={(e) => setDay(day, { roomId: e.target.value })}
+                      className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm text-slate-600"
+                    >
+                      <option value="">Без зала</option>
+                      {rooms.map((room) => (
+                        <option key={room.id} value={room.id}>
+                          {room.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               )}
             </li>

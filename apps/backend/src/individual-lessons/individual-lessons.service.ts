@@ -14,6 +14,7 @@ import { UpdateIndividualLessonDto } from "./dto/update-individual-lesson.dto";
 
 export const WITH_DETAILS = {
   teacher: { select: { id: true, fullName: true } },
+  room: { select: { id: true, name: true } },
   participants: { include: { student: { select: { id: true, fullName: true } } } },
 } as const;
 
@@ -35,6 +36,8 @@ export function mapLesson(lesson: {
   hourlyRateSnapshot: unknown;
   totalPrice: unknown;
   createdAt: Date;
+  roomId: string | null;
+  room: { id: string; name: string } | null;
   participants: {
     id: string;
     studentId: string;
@@ -54,6 +57,8 @@ export function mapLesson(lesson: {
     hourlyRateSnapshot: lesson.hourlyRateSnapshot,
     totalPrice: lesson.totalPrice,
     createdAt: lesson.createdAt,
+    roomId: lesson.roomId,
+    roomName: lesson.room?.name ?? null,
     participants: lesson.participants.map((p) => ({
       id: p.id,
       studentId: p.studentId,
@@ -96,7 +101,9 @@ export class IndividualLessonsService {
       where: { studentId, individualLesson: { tenantId } },
       include: {
         student: { select: { fullName: true } },
-        individualLesson: { include: { teacher: { select: { id: true, fullName: true } } } },
+        individualLesson: {
+          include: { teacher: { select: { id: true, fullName: true } }, room: { select: { id: true, name: true } } },
+        },
       },
       orderBy: { individualLesson: { startAt: "desc" } },
     });
@@ -117,6 +124,8 @@ export class IndividualLessonsService {
         hourlyRateSnapshot: p.individualLesson.hourlyRateSnapshot,
         totalPrice: p.individualLesson.totalPrice,
         createdAt: p.individualLesson.createdAt,
+        roomId: p.individualLesson.roomId,
+        roomName: p.individualLesson.room?.name ?? null,
       },
     }));
   }
@@ -137,7 +146,13 @@ export class IndividualLessonsService {
       throw new BadRequestException("Некоторые ученики не найдены");
     }
 
-    await this.assertNoConflict(tenantId, teacherId, new Date(dto.startAt), dto.durationMinutes);
+    const roomId = dto.roomId || undefined;
+    if (roomId) {
+      const room = await this.prisma.room.findFirst({ where: { id: roomId, tenantId } });
+      if (!room) throw new NotFoundException("Зал не найден");
+    }
+
+    const warnings = await this.assertNoConflict(tenantId, teacherId, new Date(dto.startAt), dto.durationMinutes, roomId);
 
     const hourlyRate = Number(teacher.individualLessonRate);
     const totalPrice = Math.round(hourlyRate * (dto.durationMinutes / 60) * 100) / 100;
@@ -152,6 +167,7 @@ export class IndividualLessonsService {
         hourlyRateSnapshot: hourlyRate,
         totalPrice,
         createdById: user.sub,
+        roomId,
         participants: {
           create: uniqueStudentIds.map((studentId, i) => ({ studentId, shareAmount: shares[i] })),
         },
@@ -161,7 +177,7 @@ export class IndividualLessonsService {
 
     await this.sendNotifications(tenantId, lesson, "created");
 
-    return mapLesson(lesson);
+    return { ...mapLesson(lesson), warnings };
   }
 
   async update(tenantId: string, user: JwtPayload, lessonId: string, dto: UpdateIndividualLessonDto) {
@@ -174,9 +190,23 @@ export class IndividualLessonsService {
 
     const newStartAt = dto.startAt ? new Date(dto.startAt) : lesson.startAt;
     const newDuration = dto.durationMinutes ?? lesson.durationMinutes;
+    const newRoomId = dto.roomId !== undefined ? dto.roomId || null : lesson.roomId;
 
-    if (dto.startAt !== undefined || dto.durationMinutes !== undefined) {
-      await this.assertNoConflict(tenantId, lesson.teacherId, newStartAt, newDuration, lessonId);
+    if (newRoomId) {
+      const room = await this.prisma.room.findFirst({ where: { id: newRoomId, tenantId } });
+      if (!room) throw new NotFoundException("Зал не найден");
+    }
+
+    let warnings: string[] = [];
+    if (dto.startAt !== undefined || dto.durationMinutes !== undefined || dto.roomId !== undefined) {
+      warnings = await this.assertNoConflict(
+        tenantId,
+        lesson.teacherId,
+        newStartAt,
+        newDuration,
+        newRoomId ?? undefined,
+        lessonId,
+      );
     }
 
     let newTotalPrice = Number(lesson.totalPrice);
@@ -202,7 +232,7 @@ export class IndividualLessonsService {
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.individualLesson.update({
         where: { id: lessonId },
-        data: { startAt: newStartAt, durationMinutes: newDuration, totalPrice: newTotalPrice },
+        data: { startAt: newStartAt, durationMinutes: newDuration, totalPrice: newTotalPrice, roomId: newRoomId },
       });
       for (const s of shareUpdates) {
         await tx.individualLessonParticipant.update({ where: { id: s.id }, data: { shareAmount: s.shareAmount } });
@@ -212,7 +242,7 @@ export class IndividualLessonsService {
 
     await this.sendNotifications(tenantId, updated, "updated");
 
-    return mapLesson(updated);
+    return { ...mapLesson(updated), warnings };
   }
 
   async markParticipantPaid(tenantId: string, user: JwtPayload, participantId: string, dto: MarkParticipantPaidDto) {
@@ -258,14 +288,18 @@ export class IndividualLessonsService {
   }
 
   // Запрещает пересечение нового/изменённого индивидуального занятия с расписанием групп
-  // этого преподавателя и с его другими индивидуальными занятиями в тот же день.
+  // этого преподавателя и с его другими индивидуальными занятиями в тот же день (жёсткий блок).
+  // Если указан зал (roomId), дополнительно проверяет занятость зала: по умолчанию это лишь
+  // предупреждение (решение остаётся за пользователем), а если у зала allowDoubleBooking=false —
+  // администратор явно запретил занимать зал одновременно, тогда это тоже жёсткий блок.
   private async assertNoConflict(
     tenantId: string,
     teacherId: string,
     startAt: Date,
     durationMinutes: number,
+    roomId?: string,
     excludeLessonId?: string,
-  ) {
+  ): Promise<string[]> {
     const dayOfWeek = startAt.getDay();
     const startMinutes = startAt.getHours() * 60 + startAt.getMinutes();
     const endMinutes = startMinutes + durationMinutes;
@@ -284,6 +318,8 @@ export class IndividualLessonsService {
     const dayEnd = new Date(dayStart);
     dayEnd.setDate(dayEnd.getDate() + 1);
 
+    const newEnd = new Date(startAt.getTime() + durationMinutes * 60000);
+
     const otherLessons = await this.prisma.individualLesson.findMany({
       where: {
         tenantId,
@@ -292,7 +328,6 @@ export class IndividualLessonsService {
         ...(excludeLessonId ? { id: { not: excludeLessonId } } : {}),
       },
     });
-    const newEnd = new Date(startAt.getTime() + durationMinutes * 60000);
     const lessonConflict = otherLessons.find((l) => {
       const existingEnd = new Date(l.startAt.getTime() + l.durationMinutes * 60000);
       return l.startAt < newEnd && startAt < existingEnd;
@@ -302,6 +337,45 @@ export class IndividualLessonsService {
         `Пересечение с другим индивидуальным занятием (${formatDateTime(lessonConflict.startAt)})`,
       );
     }
+
+    if (!roomId) return [];
+
+    const room = await this.prisma.room.findFirst({ where: { id: roomId, tenantId } });
+    if (!room) return [];
+
+    const warnings: string[] = [];
+
+    const roomGroupSlots = await this.prisma.groupScheduleSlot.findMany({
+      where: { dayOfWeek, roomId, group: { tenantId } },
+      include: { group: { select: { name: true } } },
+    });
+    const roomGroupConflict = roomGroupSlots.find((s) => s.startMinutes < endMinutes && startMinutes < s.endMinutes);
+    if (roomGroupConflict) {
+      const message = `Зал «${room.name}» в это время занят группой «${roomGroupConflict.group.name}»`;
+      if (!room.allowDoubleBooking) throw new ConflictException(message);
+      warnings.push(message);
+    }
+
+    const roomLessons = await this.prisma.individualLesson.findMany({
+      where: {
+        tenantId,
+        roomId,
+        startAt: { gte: dayStart, lt: dayEnd },
+        ...(excludeLessonId ? { id: { not: excludeLessonId } } : {}),
+      },
+      include: { teacher: { select: { fullName: true } } },
+    });
+    const roomLessonConflict = roomLessons.find((l) => {
+      const existingEnd = new Date(l.startAt.getTime() + l.durationMinutes * 60000);
+      return l.startAt < newEnd && startAt < existingEnd;
+    });
+    if (roomLessonConflict) {
+      const message = `Зал «${room.name}» в это время занят индивидуальным занятием (${roomLessonConflict.teacher.fullName})`;
+      if (!room.allowDoubleBooking) throw new ConflictException(message);
+      warnings.push(message);
+    }
+
+    return warnings;
   }
 
   private async sendNotifications(

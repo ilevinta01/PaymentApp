@@ -20,6 +20,7 @@ import { ReportsModule } from "./reports/reports.module";
 import { CashCollectionsModule } from "./cash-collections/cash-collections.module";
 import { IndividualLessonsModule } from "./individual-lessons/individual-lessons.module";
 import { WeeklyScheduleModule } from "./schedule/schedule.module";
+import { RoomsModule } from "./rooms/rooms.module";
 import { HealthModule } from "./health/health.module";
 
 @Module({
@@ -40,6 +41,7 @@ import { HealthModule } from "./health/health.module";
     CashCollectionsModule,
     IndividualLessonsModule,
     WeeklyScheduleModule,
+    RoomsModule,
     HealthModule,
   ],
   providers: [

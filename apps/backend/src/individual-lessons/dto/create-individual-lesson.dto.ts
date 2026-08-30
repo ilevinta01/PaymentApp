@@ -16,4 +16,8 @@ export class CreateIndividualLessonDto {
   @IsInt()
   @Min(5)
   durationMinutes: number;
+
+  @IsOptional()
+  @IsString()
+  roomId?: string;
 }

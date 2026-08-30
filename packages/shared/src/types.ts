@@ -37,12 +37,20 @@ export interface TelegramChatOptionDto {
   lastMessage: string | null;
 }
 
+export interface RoomDto {
+  id: string;
+  name: string;
+  allowDoubleBooking: boolean;
+}
+
 export interface GroupScheduleSlotDto {
   id: string;
   groupId: string;
   dayOfWeek: number;
   startTime: string;
   endTime: string;
+  roomId: string | null;
+  roomName: string | null;
 }
 
 export interface GroupDto {
@@ -59,10 +67,17 @@ export interface ScheduleGroupOccurrenceDto {
   date: string;
   startTime: string;
   endTime: string;
+  roomId: string | null;
+  roomName: string | null;
 }
 
-export interface WeeklyScheduleDto {
-  weekStart: string;
+export type ScheduleView = "day" | "week" | "month";
+export type ScheduleMode = "teacher" | "student" | "room";
+
+export interface ScheduleDto {
+  view: ScheduleView;
+  rangeStart: string;
+  rangeEnd: string;
   groupOccurrences: ScheduleGroupOccurrenceDto[];
   individualLessons: IndividualLessonDto[];
 }
@@ -191,7 +206,12 @@ export interface IndividualLessonDto {
   hourlyRateSnapshot: string;
   totalPrice: string;
   createdAt: string;
+  roomId: string | null;
+  roomName: string | null;
   participants: IndividualLessonParticipantDto[];
+  // Присутствует только в ответе на создание/изменение: не блокирующие предупреждения
+  // о пересечении зала (когда у зала разрешено двойное бронирование).
+  warnings?: string[];
 }
 
 export interface PaymentLogDto {

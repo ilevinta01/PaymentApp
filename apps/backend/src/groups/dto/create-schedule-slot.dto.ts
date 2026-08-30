@@ -1,4 +1,4 @@
-import { IsInt, Matches, Max, Min } from "class-validator";
+import { IsInt, IsOptional, IsString, Matches, Max, Min } from "class-validator";
 
 export class CreateScheduleSlotDto {
   @IsInt()
@@ -11,4 +11,8 @@ export class CreateScheduleSlotDto {
 
   @Matches(/^([01]\d|2[0-3]):[0-5]\d$/)
   endTime: string;
+
+  @IsOptional()
+  @IsString()
+  roomId?: string;
 }

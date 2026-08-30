@@ -1,6 +1,89 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getTenantSettings, updateTenantSettings } from "../../api/tenantSettings";
+import { createRoom, deleteRoom, getRooms, updateRoom } from "../../api/rooms";
+
+function RoomsSection() {
+  const queryClient = useQueryClient();
+  const { data: rooms } = useQuery({ queryKey: ["rooms"], queryFn: getRooms });
+  const [name, setName] = useState("");
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["rooms"] });
+
+  const createMutation = useMutation({
+    mutationFn: () => createRoom({ name }),
+    onSuccess: () => {
+      setName("");
+      invalidate();
+    },
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: ({ id, allowDoubleBooking }: { id: string; allowDoubleBooking: boolean }) =>
+      updateRoom(id, { allowDoubleBooking }),
+    onSuccess: invalidate,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteRoom(id),
+    onSuccess: invalidate,
+  });
+
+  return (
+    <div className="space-y-2">
+      <h2 className="text-lg font-semibold text-slate-900">Залы / классы</h2>
+      <p className="text-sm text-slate-500">
+        Если у зала выключено «Разрешить двойное бронирование», при пересечении с другим занятием в этом зале
+        система не даст создать запись. Иначе будет показано лишь предупреждение — решение остаётся за пользователем.
+      </p>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (name.trim()) createMutation.mutate();
+        }}
+        className="flex gap-2"
+      >
+        <input
+          placeholder="Название зала"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="flex-1 rounded-lg border border-slate-300 px-3 py-2"
+        />
+        <button
+          disabled={createMutation.isPending || !name.trim()}
+          className="rounded-lg bg-[var(--brand-primary)] text-white px-4 py-2 font-medium disabled:opacity-60"
+        >
+          Добавить
+        </button>
+      </form>
+      <ul className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
+        {rooms?.map((room) => (
+          <li key={room.id} className="flex items-center justify-between gap-2 px-4 py-3">
+            <span className="font-medium text-slate-800">{room.name}</span>
+            <label className="flex items-center gap-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                checked={room.allowDoubleBooking}
+                onChange={(e) => toggleMutation.mutate({ id: room.id, allowDoubleBooking: e.target.checked })}
+                className="h-4 w-4"
+              />
+              Разрешить двойное бронирование
+            </label>
+            <button
+              onClick={() => {
+                if (confirm(`Удалить зал «${room.name}»?`)) deleteMutation.mutate(room.id);
+              }}
+              className="text-sm font-medium text-red-600"
+            >
+              Удалить
+            </button>
+          </li>
+        ))}
+        {rooms?.length === 0 && <li className="px-4 py-4 text-slate-500">Залы ещё не добавлены</li>}
+      </ul>
+    </div>
+  );
+}
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
@@ -68,6 +151,8 @@ export default function SettingsPage() {
           </p>
         )}
       </div>
+
+      {data?.isScheduleEnabled && <RoomsSection />}
     </div>
   );
 }

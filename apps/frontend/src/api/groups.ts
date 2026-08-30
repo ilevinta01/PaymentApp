@@ -16,12 +16,18 @@ export async function updateGroup(id: string, payload: { name?: string; monthlyP
   return data;
 }
 
-export async function addScheduleSlot(groupId: string, payload: { dayOfWeek: number; startTime: string; endTime: string }) {
+export async function addScheduleSlot(
+  groupId: string,
+  payload: { dayOfWeek: number; startTime: string; endTime: string; roomId?: string },
+) {
   const { data } = await apiClient.post(`/groups/${groupId}/schedule-slots`, payload);
   return data;
 }
 
-export async function updateScheduleSlot(slotId: string, payload: { startTime: string; endTime: string }) {
+export async function updateScheduleSlot(
+  slotId: string,
+  payload: { startTime: string; endTime: string; roomId?: string },
+) {
   const { data } = await apiClient.patch(`/groups/schedule-slots/${slotId}`, payload);
   return data;
 }
