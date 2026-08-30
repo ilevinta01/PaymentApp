@@ -193,13 +193,7 @@ function BalanceSection({
         </button>
       </div>
       {mutation.isError && <p className="text-sm text-red-600">Не удалось пополнить баланс.</p>}
-      {mutation.isSuccess && mutation.data && (
-        <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-700">
-          {mutation.data.coveredMonths.length > 0
-            ? `Пополнено. Автоматически оплачено за: ${mutation.data.coveredMonths.join(", ")}.`
-            : "Баланс пополнен."}
-        </p>
-      )}
+      {mutation.isSuccess && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-700">Баланс пополнен.</p>}
       {showHistory && (
         <ul className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 bg-white text-xs">
           {history?.map((t) => (
@@ -234,15 +228,16 @@ function PaymentForm({
   const queryClient = useQueryClient();
   const isAdmin = useAuthStore((s) => s.user?.role) === Role.SUPER_ADMIN;
   const { data: settings } = useQuery({ queryKey: ["tenant-settings"], queryFn: getTenantSettings });
-  const [method, setMethod] = useState<PaymentMethod>(PaymentMethod.CASH);
   const [amount, setAmount] = useState("");
+  const enteredAmount = isAdmin ? Number(amount) : Number(student.group?.monthlyPrice ?? 0);
+  const canPayFromBalance = enteredAmount > 0 && Number(student.balance) >= enteredAmount;
 
   const mutation = useMutation({
-    mutationFn: () =>
+    mutationFn: (payload: { paymentMethod: PaymentMethod } | { fromBalance: true }) =>
       createPayment({
         studentId: student.id,
-        paymentMethod: method,
         amount: isAdmin ? Number(amount) : undefined,
+        ...payload,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["students"] });
@@ -283,23 +278,33 @@ function PaymentForm({
           ) : (
             <p className="text-sm text-slate-500">Фиксированная сумма: {student.group?.monthlyPrice}</p>
           )}
-          {settings?.isCardEnabled && (
-            <select
-              value={method}
-              onChange={(e) => setMethod(e.target.value as PaymentMethod)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2"
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => mutation.mutate({ paymentMethod: PaymentMethod.CASH })}
+              disabled={mutation.isPending || (isAdmin && !amount)}
+              className="flex-1 rounded-lg bg-[var(--brand-primary)] py-2.5 font-medium text-white disabled:opacity-60"
             >
-              <option value={PaymentMethod.CASH}>Наличные</option>
-              <option value={PaymentMethod.CARD}>Карта</option>
-            </select>
-          )}
-          <button
-            onClick={() => mutation.mutate()}
-            disabled={mutation.isPending || (isAdmin && !amount)}
-            className="w-full rounded-lg bg-[var(--brand-primary)] py-2.5 font-medium text-white disabled:opacity-60"
-          >
-            {mutation.isPending ? "Сохраняем…" : "Записать оплату"}
-          </button>
+              {mutation.isPending ? "Сохраняем…" : "Наличные"}
+            </button>
+            {settings?.isCardEnabled && (
+              <button
+                onClick={() => mutation.mutate({ paymentMethod: PaymentMethod.CARD })}
+                disabled={mutation.isPending || (isAdmin && !amount)}
+                className="flex-1 rounded-lg bg-[var(--brand-primary)] py-2.5 font-medium text-white disabled:opacity-60"
+              >
+                {mutation.isPending ? "Сохраняем…" : "Карта"}
+              </button>
+            )}
+            {canPayFromBalance && (
+              <button
+                onClick={() => mutation.mutate({ fromBalance: true })}
+                disabled={mutation.isPending}
+                className="flex-1 rounded-lg border border-[var(--brand-primary)] py-2.5 font-medium text-[var(--brand-primary)] disabled:opacity-60"
+              >
+                С баланса
+              </button>
+            )}
+          </div>
           {mutation.isError && <p className="text-sm text-red-600">Не удалось записать оплату.</p>}
         </>
       )}

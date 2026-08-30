@@ -6,7 +6,9 @@ export async function getPayments(periodMonth?: string): Promise<PaymentDto[]> {
   return data;
 }
 
-export async function createPayment(payload: { studentId: string; paymentMethod: PaymentMethod; amount?: number }) {
+export async function createPayment(
+  payload: { studentId: string; amount?: number } & ({ paymentMethod: PaymentMethod } | { fromBalance: true }),
+) {
   const { data } = await apiClient.post<PaymentDto>("/payments", payload);
   return data;
 }

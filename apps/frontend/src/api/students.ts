@@ -44,7 +44,7 @@ export async function deleteStudent(id: string) {
 export async function depositBalance(
   studentId: string,
   payload: { amount: number; paymentMethod: PaymentMethod; note?: string },
-): Promise<StudentDto & { coveredMonths: string[] }> {
+): Promise<StudentDto> {
   const { data } = await apiClient.post(`/students/${studentId}/balance/deposit`, payload);
   return data;
 }

@@ -44,14 +44,13 @@ export default function StudentDetailPage() {
   };
 
   // Оплата
-  const [method, setMethod] = useState<PaymentMethod>(PaymentMethod.CASH);
   const [amount, setAmount] = useState("");
   const paymentMutation = useMutation({
-    mutationFn: () =>
+    mutationFn: (payload: { paymentMethod: PaymentMethod } | { fromBalance: true }) =>
       createPayment({
         studentId: studentId!,
-        paymentMethod: method,
         amount: isAdmin ? Number(amount) : undefined,
+        ...payload,
       }),
     onSuccess: () => {
       invalidateStudent();
@@ -116,6 +115,9 @@ export default function StudentDetailPage() {
 
   if (isLoading || !student) return <p className="text-slate-500">Загрузка…</p>;
 
+  const enteredAmount = isAdmin ? Number(amount) : Number(student.group?.monthlyPrice ?? 0);
+  const canPayFromBalance = enteredAmount > 0 && Number(student.balance) >= enteredAmount;
+
   return (
     <div className="space-y-6">
       <div>
@@ -167,23 +169,33 @@ export default function StudentDetailPage() {
           ) : (
             <p className="text-sm text-slate-500">Фиксированная сумма: {student.group?.monthlyPrice}</p>
           )}
-          {settings?.isCardEnabled && (
-            <select
-              value={method}
-              onChange={(e) => setMethod(e.target.value as PaymentMethod)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2"
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => paymentMutation.mutate({ paymentMethod: PaymentMethod.CASH })}
+              disabled={paymentMutation.isPending || (isAdmin && !amount)}
+              className="flex-1 rounded-lg bg-[var(--brand-primary)] py-2.5 font-medium text-white disabled:opacity-60"
             >
-              <option value={PaymentMethod.CASH}>Наличные</option>
-              <option value={PaymentMethod.CARD}>Карта</option>
-            </select>
-          )}
-          <button
-            onClick={() => paymentMutation.mutate()}
-            disabled={paymentMutation.isPending || (isAdmin && !amount)}
-            className="w-full rounded-lg bg-[var(--brand-primary)] py-2.5 font-medium text-white disabled:opacity-60"
-          >
-            {paymentMutation.isPending ? "Сохраняем…" : "Записать оплату"}
-          </button>
+              {paymentMutation.isPending ? "Сохраняем…" : "Наличные"}
+            </button>
+            {settings?.isCardEnabled && (
+              <button
+                onClick={() => paymentMutation.mutate({ paymentMethod: PaymentMethod.CARD })}
+                disabled={paymentMutation.isPending || (isAdmin && !amount)}
+                className="flex-1 rounded-lg bg-[var(--brand-primary)] py-2.5 font-medium text-white disabled:opacity-60"
+              >
+                {paymentMutation.isPending ? "Сохраняем…" : "Карта"}
+              </button>
+            )}
+            {canPayFromBalance && (
+              <button
+                onClick={() => paymentMutation.mutate({ fromBalance: true })}
+                disabled={paymentMutation.isPending}
+                className="flex-1 rounded-lg border border-[var(--brand-primary)] py-2.5 font-medium text-[var(--brand-primary)] disabled:opacity-60"
+              >
+                С баланса
+              </button>
+            )}
+          </div>
           {paymentMutation.isError && <p className="text-sm text-red-600">Не удалось записать оплату.</p>}
         </div>
       )}
@@ -220,13 +232,7 @@ export default function StudentDetailPage() {
             </button>
           </div>
           {depositMutation.isError && <p className="text-sm text-red-600">Не удалось пополнить баланс.</p>}
-          {depositMutation.isSuccess && depositMutation.data && (
-            <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">
-              {depositMutation.data.coveredMonths.length > 0
-                ? `Пополнено. Автоматически оплачено за: ${depositMutation.data.coveredMonths.join(", ")}.`
-                : "Баланс пополнен."}
-            </p>
-          )}
+          {depositMutation.isSuccess && <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">Баланс пополнен.</p>}
         </div>
       )}
 

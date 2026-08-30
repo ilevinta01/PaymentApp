@@ -43,10 +43,6 @@ export class PaymentsService {
 
     const settings = await this.prisma.tenantSettings.findUnique({ where: { tenantId } });
 
-    if (dto.paymentMethod === PaymentMethod.CARD && !settings?.isCardEnabled) {
-      throw new ForbiddenException("Оплата картой не включена в настройках детского центра");
-    }
-
     let amount: number;
     if (user.role === Role.TEACHER) {
       amount = Number(student.group.monthlyPrice);
@@ -57,26 +53,60 @@ export class PaymentsService {
       amount = dto.amount;
     }
 
+    if (dto.fromBalance) {
+      if (Number(student.balance) < amount) {
+        throw new BadRequestException("На балансе ученика недостаточно средств");
+      }
+    } else {
+      if (!dto.paymentMethod) throw new BadRequestException("Не указан способ оплаты");
+      if (dto.paymentMethod === PaymentMethod.CARD && !settings?.isCardEnabled) {
+        throw new ForbiddenException("Оплата картой не включена в настройках детского центра");
+      }
+    }
+
     const periodMonth = user.role === Role.SUPER_ADMIN && dto.periodMonth ? dto.periodMonth : getCurrentPeriodMonth();
 
-    const payment = await this.prisma.payment.create({
-      data: {
-        tenantId,
-        studentId: student.id,
-        amount,
-        paymentMethod: dto.paymentMethod,
-        createdById: user.sub,
-        periodMonth,
-      },
-      include: WITH_STUDENT,
-    });
+    const [payment] = await this.prisma.$transaction([
+      this.prisma.payment.create({
+        data: {
+          tenantId,
+          studentId: student.id,
+          amount,
+          paymentMethod: dto.fromBalance ? PaymentMethod.CASH : dto.paymentMethod!,
+          createdById: user.sub,
+          periodMonth,
+          fundedFromBalance: !!dto.fromBalance,
+        },
+        include: WITH_STUDENT,
+      }),
+      ...(dto.fromBalance
+        ? [
+            this.prisma.student.update({
+              where: { id: student.id },
+              data: { balance: { decrement: amount } },
+            }),
+            this.prisma.balanceTransaction.create({
+              data: {
+                tenantId,
+                studentId: student.id,
+                amount: -amount,
+                kind: "GROUP_CONSUMPTION",
+                createdById: user.sub,
+                note: `Месяц ${periodMonth}`,
+              },
+            }),
+          ]
+        : []),
+    ]);
+
+    const methodLabel = dto.fromBalance ? "С баланса (аванс)" : METHOD_LABEL[dto.paymentMethod!];
 
     if (settings?.isTelegramEnabled && settings?.telegramBotToken && student.parentTelegramChatId) {
       const text = [
         "Оплата получена",
         `Ученик: ${student.fullName}`,
         `Сумма: ${amount}`,
-        `Способ: ${METHOD_LABEL[dto.paymentMethod]}`,
+        `Способ: ${methodLabel}`,
         `Месяц: ${periodMonth}`,
       ].join("\n");
       await this.telegram.sendMessage(settings.telegramBotToken, student.parentTelegramChatId, text);

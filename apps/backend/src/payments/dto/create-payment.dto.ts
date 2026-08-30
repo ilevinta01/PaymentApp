@@ -1,12 +1,18 @@
-import { IsEnum, IsNumber, IsOptional, IsString, Min } from "class-validator";
+import { IsBoolean, IsEnum, IsNumber, IsOptional, IsString, Min } from "class-validator";
 import { PaymentMethod } from "@oplata/shared";
 
 export class CreatePaymentDto {
   @IsString()
   studentId!: string;
 
+  // Не обязателен, если fromBalance=true — тогда оплата списывается с баланса (аванса) ученика.
+  @IsOptional()
   @IsEnum(PaymentMethod)
-  paymentMethod!: PaymentMethod;
+  paymentMethod?: PaymentMethod;
+
+  @IsOptional()
+  @IsBoolean()
+  fromBalance?: boolean;
 
   // Обязательна только для Супер-Админа — у Преподавателя сумма всегда фиксируется по цене группы.
   @IsOptional()
