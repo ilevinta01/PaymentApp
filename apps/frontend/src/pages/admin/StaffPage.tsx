@@ -170,6 +170,19 @@ function StaffRow({
           )}
         </div>
       )}
+
+      {member.role === Role.SUPER_ADMIN && showIndividualLessonRate && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 p-3">
+          <span className="text-sm text-slate-600">
+            Telegram для уведомлений об отменённых занятиях (когда отменяет преподаватель):
+          </span>
+          {member.telegramChatId ? (
+            <span className="text-sm text-emerald-600">привязан</span>
+          ) : (
+            <TelegramChatPicker onSelect={(chatId) => telegramMutation.mutate(chatId)} />
+          )}
+        </div>
+      )}
     </li>
   );
 }

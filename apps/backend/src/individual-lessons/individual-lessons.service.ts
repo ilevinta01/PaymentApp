@@ -298,6 +298,30 @@ export class IndividualLessonsService {
     return { ...mapLesson(updated), warnings };
   }
 
+  async remove(tenantId: string, user: JwtPayload, lessonId: string) {
+    const lesson = await this.prisma.individualLesson.findFirst({ where: { id: lessonId, tenantId }, include: WITH_DETAILS });
+    if (!lesson) throw new NotFoundException("Занятие не найдено");
+
+    if (user.role === Role.TEACHER && lesson.teacherId !== user.sub) {
+      throw new ForbiddenException("Это занятие ведёт другой преподаватель");
+    }
+
+    if (lesson.participants.some((p) => p.isPaid)) {
+      throw new BadRequestException(
+        "По этому занятию уже есть оплата — отменить его нельзя, чтобы не потерять финансовые записи.",
+      );
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.individualLessonParticipant.deleteMany({ where: { individualLessonId: lessonId } }),
+      this.prisma.individualLesson.delete({ where: { id: lessonId } }),
+    ]);
+
+    await this.sendCancellationNotifications(tenantId, lesson, user.role);
+
+    return { success: true };
+  }
+
   async markParticipantPaid(tenantId: string, user: JwtPayload, participantId: string, dto: MarkParticipantPaidDto) {
     const participant = await this.prisma.individualLessonParticipant.findFirst({
       where: { id: participantId, individualLesson: { tenantId } },
@@ -518,6 +542,69 @@ export class IndividualLessonsService {
         `Длительность: ${lesson.durationMinutes} мин`,
         `Ваша часть оплаты: ${participant.shareAmount}`,
         ...(conflict ? [`⚠ Внимание: это время пересекается с занятием группы «${conflict.groupName}»`] : []),
+      ].join("\n");
+      await this.telegram.sendMessage(settings.telegramBotToken, student.parentTelegramChatId, text);
+    }
+  }
+
+  // Кто отменил — тому уведомление НЕ шлём, а другой стороне (преподаватель↔админ) — шлём:
+  // отменил админ → сообщение преподавателю; отменил преподаватель → сообщение всем админам
+  // тенанта, у которых привязан Telegram. Родителям — уведомление в любом случае.
+  private async sendCancellationNotifications(
+    tenantId: string,
+    lesson: {
+      startAt: Date;
+      durationMinutes: number;
+      teacherId: string;
+      teacher: { id: string; fullName: string };
+      participants: { student: { id: string; fullName: string } }[];
+    },
+    cancelledByRole: Role,
+  ) {
+    const settings = await this.prisma.tenantSettings.findUnique({ where: { tenantId } });
+    if (!settings?.isTelegramEnabled || !settings.telegramBotToken) return;
+
+    const when = formatDateTime(lesson.startAt);
+    const studentNames = lesson.participants.map((p) => p.student.fullName).join(", ");
+
+    if (cancelledByRole === Role.SUPER_ADMIN) {
+      const teacherFull = await this.prisma.user.findUnique({ where: { id: lesson.teacherId } });
+      if (teacherFull?.telegramChatId) {
+        const text = [
+          "Индивидуальное занятие отменено администратором",
+          `Дата и время: ${when}`,
+          `Длительность: ${lesson.durationMinutes} мин`,
+          `Ученики: ${studentNames}`,
+        ].join("\n");
+        await this.telegram.sendMessage(settings.telegramBotToken, teacherFull.telegramChatId, text);
+      }
+    } else {
+      const admins = await this.prisma.user.findMany({
+        where: { tenantId, role: Role.SUPER_ADMIN, telegramChatId: { not: null } },
+      });
+      for (const admin of admins) {
+        const text = [
+          "Преподаватель отменил индивидуальное занятие",
+          `Преподаватель: ${lesson.teacher.fullName}`,
+          `Дата и время: ${when}`,
+          `Длительность: ${lesson.durationMinutes} мин`,
+          `Ученики: ${studentNames}`,
+        ].join("\n");
+        await this.telegram.sendMessage(settings.telegramBotToken, admin.telegramChatId!, text);
+      }
+    }
+
+    const students = await this.prisma.student.findMany({
+      where: { id: { in: lesson.participants.map((p) => p.student.id) } },
+    });
+    for (const participant of lesson.participants) {
+      const student = students.find((s) => s.id === participant.student.id);
+      if (!student?.parentTelegramChatId) continue;
+      const text = [
+        "Индивидуальное занятие отменено",
+        `Ученик: ${student.fullName}`,
+        `Преподаватель: ${lesson.teacher.fullName}`,
+        `Дата и время: ${when}`,
       ].join("\n");
       await this.telegram.sendMessage(settings.telegramBotToken, student.parentTelegramChatId, text);
     }

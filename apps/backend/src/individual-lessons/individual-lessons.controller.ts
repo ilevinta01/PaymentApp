@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/common";
 import { JwtPayload, Role } from "@oplata/shared";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
@@ -32,6 +32,11 @@ export class IndividualLessonsController {
   @Patch(":id")
   update(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Body() dto: UpdateIndividualLessonDto) {
     return this.service.update(user.tenantId, user, id, dto);
+  }
+
+  @Delete(":id")
+  remove(@CurrentUser() user: JwtPayload, @Param("id") id: string) {
+    return this.service.remove(user.tenantId, user, id);
   }
 
   @Post("participants/:participantId/pay")

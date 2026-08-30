@@ -26,6 +26,11 @@ export async function createIndividualLesson(payload: {
   return data;
 }
 
+export async function deleteIndividualLesson(lessonId: string) {
+  const { data } = await apiClient.delete(`/individual-lessons/${lessonId}`);
+  return data;
+}
+
 export async function markIndividualLessonParticipantPaid(participantId: string, paymentMethod: PaymentMethod) {
   const { data } = await apiClient.post(`/individual-lessons/participants/${participantId}/pay`, { paymentMethod });
   return data;

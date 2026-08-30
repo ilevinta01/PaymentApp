@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IndividualLessonDto, PaymentMethod, Role } from "@oplata/shared";
 import {
   createIndividualLesson,
+  deleteIndividualLesson,
   getIndividualLessons,
   markIndividualLessonParticipantPaid,
   updateIndividualLesson,
@@ -421,6 +422,11 @@ function LessonRow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteIndividualLesson(lesson.id),
+    onSuccess: onChanged,
+  });
+
   return (
     <li ref={rowRef} className={`space-y-2 px-4 py-4 ${autoEdit ? "bg-amber-50" : ""}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -435,11 +441,27 @@ function LessonRow({
           </p>
         </div>
         {canEdit && !editing && (
-          <button onClick={() => setEditing(true)} className="text-sm font-medium text-[var(--brand-primary)]">
-            Изменить
-          </button>
+          <div className="flex gap-3">
+            <button onClick={() => setEditing(true)} className="text-sm font-medium text-[var(--brand-primary)]">
+              Изменить
+            </button>
+            <button
+              onClick={() => {
+                if (confirm("Отменить это индивидуальное занятие? Преподаватель/администратор и родители получат уведомление.")) {
+                  deleteMutation.mutate();
+                }
+              }}
+              disabled={deleteMutation.isPending}
+              className="text-sm font-medium text-red-600"
+            >
+              Отменить
+            </button>
+          </div>
         )}
       </div>
+      {deleteMutation.isError && (
+        <p className="text-sm text-red-600">{getErrorMessage(deleteMutation.error, "Не удалось отменить занятие.")}</p>
+      )}
 
       {editing && (
         <EditLessonForm
