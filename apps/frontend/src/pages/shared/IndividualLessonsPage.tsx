@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IndividualLessonDto, PaymentMethod, Role } from "@oplata/shared";
 import {
@@ -42,6 +43,7 @@ function CreateLessonForm({ onCreated, showRooms }: { onCreated: () => void; sho
   const [minute, setMinute] = useState("");
   const [durationMinutes, setDurationMinutes] = useState(60);
   const [roomId, setRoomId] = useState("");
+  const [subject, setSubject] = useState("");
   const [warnings, setWarnings] = useState<string[]>([]);
 
   const trimmedQuery = studentQuery.trim();
@@ -59,6 +61,7 @@ function CreateLessonForm({ onCreated, showRooms }: { onCreated: () => void; sho
         startAt: new Date(`${date}T${hour}:${minute}`).toISOString(),
         durationMinutes,
         roomId: roomId || undefined,
+        subject: subject.trim() || undefined,
       }),
     onSuccess: (result) => {
       onCreated();
@@ -70,6 +73,7 @@ function CreateLessonForm({ onCreated, showRooms }: { onCreated: () => void; sho
       setMinute("");
       setDurationMinutes(60);
       setRoomId("");
+      setSubject("");
     },
   });
 
@@ -208,6 +212,13 @@ function CreateLessonForm({ onCreated, showRooms }: { onCreated: () => void; sho
         </select>
       )}
 
+      <input
+        placeholder="Тип занятия (необязательно): математика, латино, балет…"
+        value={subject}
+        onChange={(e) => setSubject(e.target.value)}
+        className="w-full rounded-lg border border-slate-300 px-3 py-2"
+      />
+
       <p className="text-xs text-slate-400">
         Стоимость рассчитается автоматически (ставка преподавателя × длительность) и поровну разделится между
         выбранными учениками. Учитель и родители получат уведомление в Telegram, если оно подключено.
@@ -250,6 +261,7 @@ function EditLessonForm({
   const [minute, setMinute] = useState(String(Math.floor(start.getMinutes() / 5) * 5).padStart(2, "0"));
   const [durationMinutes, setDurationMinutes] = useState(lesson.durationMinutes);
   const [roomId, setRoomId] = useState(lesson.roomId ?? "");
+  const [subject, setSubject] = useState(lesson.subject ?? "");
   const { data: rooms } = useQuery({ queryKey: ["rooms"], queryFn: getRooms, enabled: showRooms });
 
   const mutation = useMutation({
@@ -258,6 +270,7 @@ function EditLessonForm({
         startAt: new Date(`${date}T${hour}:${minute}`).toISOString(),
         durationMinutes,
         roomId,
+        subject: subject.trim(),
       }),
     onSuccess: (result) => {
       onWarnings(result.warnings ?? []);
@@ -320,6 +333,12 @@ function EditLessonForm({
           ))}
         </select>
       )}
+      <input
+        placeholder="Тип занятия (необязательно)"
+        value={subject}
+        onChange={(e) => setSubject(e.target.value)}
+        className="w-full rounded-lg border border-slate-300 px-3 py-2"
+      />
       <div className="flex gap-2">
         <button
           onClick={() => mutation.mutate()}
@@ -344,6 +363,7 @@ function LessonRow({
   canEdit,
   isCardEnabled,
   showRooms,
+  autoEdit,
   onChanged,
   onWarnings,
   payMutation,
@@ -352,17 +372,27 @@ function LessonRow({
   canEdit: boolean;
   isCardEnabled: boolean;
   showRooms: boolean;
+  autoEdit: boolean;
   onChanged: () => void;
   onWarnings: (warnings: string[]) => void;
   payMutation: ReturnType<typeof useMutation<unknown, Error, { participantId: string; method: PaymentMethod }>>;
 }) {
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(autoEdit && canEdit);
+  const rowRef = useRef<HTMLLIElement>(null);
+
+  useEffect(() => {
+    if (autoEdit) rowRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
-    <li className="space-y-2 px-4 py-4">
+    <li ref={rowRef} className={`space-y-2 px-4 py-4 ${autoEdit ? "bg-amber-50" : ""}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="font-medium text-slate-800">{formatDateTime(lesson.startAt)}</p>
+          <p className="font-medium text-slate-800">
+            {formatDateTime(lesson.startAt)}
+            {lesson.subject ? ` · ${lesson.subject}` : ""}
+          </p>
           <p className="text-sm text-slate-500">
             {lesson.teacherName} · {lesson.durationMinutes} мин · {lesson.totalPrice}
             {lesson.roomName ? ` · ${lesson.roomName}` : ""}
@@ -429,6 +459,8 @@ export default function IndividualLessonsPage() {
   const { data: lessons, isLoading } = useQuery({ queryKey: ["individual-lessons"], queryFn: getIndividualLessons });
   const { data: settings } = useQuery({ queryKey: ["tenant-settings"], queryFn: getTenantSettings });
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get("edit");
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["individual-lessons"] });
 
@@ -459,6 +491,7 @@ export default function IndividualLessonsPage() {
             canEdit={isAdmin || lesson.teacherId === currentUser?.id}
             isCardEnabled={!!settings?.isCardEnabled}
             showRooms={!!settings?.isScheduleEnabled}
+            autoEdit={lesson.id === editId}
             onChanged={invalidate}
             onWarnings={setWarnings}
             payMutation={payMutation}

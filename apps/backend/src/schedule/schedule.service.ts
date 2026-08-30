@@ -58,6 +58,7 @@ function expandGroupOccurrences(
   groups: {
     id: string;
     name: string;
+    color: string;
     scheduleSlots: { dayOfWeek: number; startMinutes: number; endMinutes: number; roomId: string | null; room: { name: string } | null }[];
   }[],
   rangeStart: Date,
@@ -66,6 +67,7 @@ function expandGroupOccurrences(
   const occurrences: {
     groupId: string;
     groupName: string;
+    groupColor: string;
     date: string;
     startTime: string;
     endTime: string;
@@ -82,6 +84,7 @@ function expandGroupOccurrences(
         occurrences.push({
           groupId: group.id,
           groupName: group.name,
+          groupColor: group.color,
           date: dateStr,
           startTime: minutesToTime(slot.startMinutes),
           endTime: minutesToTime(slot.endMinutes),

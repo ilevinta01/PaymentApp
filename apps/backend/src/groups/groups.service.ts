@@ -66,6 +66,7 @@ export class GroupsService {
         tenantId,
         name: dto.name,
         monthlyPrice: dto.monthlyPrice,
+        ...(dto.color ? { color: dto.color } : {}),
       },
     });
   }

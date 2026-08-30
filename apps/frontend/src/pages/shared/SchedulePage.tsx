@@ -1,15 +1,21 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Role, ScheduleMode, ScheduleView } from "@oplata/shared";
+import { IndividualLessonDto, Role, ScheduleGroupOccurrenceDto, ScheduleMode, ScheduleView } from "@oplata/shared";
 import { getSchedule } from "../../api/schedule";
 import { getStaff } from "../../api/users";
 import { getStudents } from "../../api/students";
 import { getRooms } from "../../api/rooms";
+import { getTenantSettings } from "../../api/tenantSettings";
 import { useAuthStore } from "../../store/auth.store";
+import { useBasePath } from "../../hooks/useBasePath";
 
 const DAY_LABELS = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"];
 const MODE_LABELS: Record<ScheduleMode, string> = { teacher: "Преподаватель", student: "Ученик", room: "Зал" };
 const VIEW_LABELS: Record<ScheduleView, string> = { day: "День", week: "Неделя", month: "Месяц" };
+const DEFAULT_HOUR_START = 8;
+const DEFAULT_HOUR_END = 21;
+const HOUR_PX = 56;
 
 function toDateStr(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -33,55 +39,151 @@ function addDays(dateStr: string, days: number): string {
   return toDateStr(d);
 }
 
-function DayCard({
-  date,
-  label,
-  groupOccurrences,
-  individualLessons,
-}: {
+function timeStrToMinutes(time: string): number {
+  const [h, m] = time.split(":").map(Number);
+  return h * 60 + m;
+}
+
+interface GridItem {
+  key: string;
   date: string;
-  label: string;
-  groupOccurrences: { date: string; groupName: string; startTime: string; endTime: string; roomName: string | null }[];
-  individualLessons: { startAt: string; teacherName: string; roomName: string | null; participants: { studentName: string }[] }[];
+  startMinutes: number;
+  endMinutes: number;
+  color: string;
+  title: string;
+  tooltipLines: string[];
+  onClick?: () => void;
+}
+
+function TimeGrid({
+  days,
+  hourStart,
+  hourEnd,
+  items,
+}: {
+  days: { date: string; label: string }[];
+  hourStart: number;
+  hourEnd: number;
+  items: GridItem[];
 }) {
-  const groupItems = groupOccurrences.filter((g) => g.date === date);
-  const lessonItems = individualLessons.filter((l) => l.startAt.slice(0, 10) === date);
-  const items = [
-    ...groupItems.map((g) => ({
-      time: g.startTime,
-      label: `Группа «${g.groupName}»`,
-      sub: [`до ${g.endTime}`, g.roomName].filter(Boolean).join(" · "),
-    })),
-    ...lessonItems.map((l) => ({
-      time: new Date(l.startAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }),
-      label: `Индивидуальное · ${l.teacherName}`,
-      sub: [l.participants.map((p) => p.studentName).join(", "), l.roomName].filter(Boolean).join(" · "),
-    })),
-  ].sort((a, b) => a.time.localeCompare(b.time));
+  const hours = Array.from({ length: hourEnd - hourStart + 1 }, (_, i) => hourStart + i);
+  const gridHeight = (hourEnd - hourStart) * HOUR_PX;
+
+  function top(minutes: number) {
+    const clamped = Math.min(Math.max(minutes, hourStart * 60), hourEnd * 60);
+    return ((clamped - hourStart * 60) / 60) * HOUR_PX;
+  }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-3">
-      <p className="mb-2 text-sm font-semibold text-slate-700">{label}</p>
-      {items.length === 0 && <p className="text-sm text-slate-400">Занятий нет</p>}
-      <ul className="space-y-1">
-        {items.map((item, idx) => (
-          <li key={idx} className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="w-12 shrink-0 font-medium text-slate-800">{item.time}</span>
-            <span className="text-slate-700">{item.label}</span>
-            <span className="text-slate-400">{item.sub}</span>
-          </li>
-        ))}
-      </ul>
+    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+      <div className="flex" style={{ minWidth: days.length > 1 ? days.length * 150 + 44 : 260 }}>
+        <div className="w-11 shrink-0 border-r border-slate-100">
+          <div className="h-8 border-b border-slate-100" />
+          {hours.map((h) => (
+            <div key={h} style={{ height: HOUR_PX }} className="relative">
+              <span className="absolute -top-2 right-1 text-[11px] text-slate-400">{h}:00</span>
+            </div>
+          ))}
+        </div>
+        {days.map((day) => {
+          const dayItems = items.filter((it) => it.date === day.date);
+          return (
+            <div key={day.date} className="relative min-w-[150px] flex-1 border-r border-slate-100 last:border-r-0">
+              <div className="flex h-8 items-center justify-center border-b border-slate-100 text-xs font-semibold text-slate-700">
+                {day.label}
+              </div>
+              <div className="relative" style={{ height: gridHeight }}>
+                {hours.slice(1).map((h) => (
+                  <div
+                    key={h}
+                    className="absolute left-0 right-0 border-t border-slate-100"
+                    style={{ top: (h - hourStart) * HOUR_PX }}
+                  />
+                ))}
+                {dayItems.length === 0 && (
+                  <p className="absolute inset-x-0 top-4 text-center text-xs text-slate-300">Занятий нет</p>
+                )}
+                {dayItems.map((item) => (
+                  <div
+                    key={item.key}
+                    className="group absolute left-0.5 right-0.5 z-0 hover:z-10"
+                    style={{ top: top(item.startMinutes), height: Math.max(top(item.endMinutes) - top(item.startMinutes), 18) }}
+                  >
+                    <button
+                      type="button"
+                      onClick={item.onClick}
+                      disabled={!item.onClick}
+                      className="h-full w-full overflow-hidden rounded px-1 text-left text-[11px] leading-tight text-white shadow-sm"
+                      style={{ background: item.color, cursor: item.onClick ? "pointer" : "default" }}
+                    >
+                      {item.title}
+                    </button>
+                    <div className="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-56 rounded-lg border border-slate-200 bg-white p-2 text-xs text-slate-700 shadow-lg group-hover:block">
+                      <p className="font-semibold">{item.title}</p>
+                      {item.tooltipLines.map((line) => (
+                        <p key={line}>{line}</p>
+                      ))}
+                      {item.onClick && <p className="mt-1 font-medium text-[var(--brand-primary)]">Открыть →</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
+}
+
+function buildItems(
+  groupOccurrences: ScheduleGroupOccurrenceDto[],
+  individualLessons: IndividualLessonDto[],
+  lessonColor: string,
+  onLessonClick: (lesson: IndividualLessonDto) => void,
+): GridItem[] {
+  const groupItems: GridItem[] = groupOccurrences.map((g) => ({
+    key: `g-${g.groupId}-${g.date}-${g.startTime}`,
+    date: g.date,
+    startMinutes: timeStrToMinutes(g.startTime),
+    endMinutes: timeStrToMinutes(g.endTime),
+    color: g.groupColor,
+    title: `Группа «${g.groupName}»`,
+    tooltipLines: [`${g.startTime}–${g.endTime}`, g.roomName ?? ""].filter(Boolean),
+  }));
+
+  const lessonItems: GridItem[] = individualLessons.map((l) => {
+    const start = new Date(l.startAt);
+    const startMinutes = start.getHours() * 60 + start.getMinutes();
+    return {
+      key: `l-${l.id}`,
+      date: l.startAt.slice(0, 10),
+      startMinutes,
+      endMinutes: startMinutes + l.durationMinutes,
+      color: lessonColor,
+      title: l.subject ? `Инд. · ${l.subject}` : "Индивидуальное",
+      tooltipLines: [
+        `Преподаватель: ${l.teacherName}`,
+        `Ученики: ${l.participants.map((p) => p.studentName).join(", ")}`,
+        l.roomName ? `Зал: ${l.roomName}` : "",
+      ].filter(Boolean),
+      onClick: () => onLessonClick(l),
+    };
+  });
+
+  return [...groupItems, ...lessonItems];
 }
 
 export default function SchedulePage() {
   const isAdmin = useAuthStore((s) => s.user?.role) === Role.SUPER_ADMIN;
   const currentUserId = useAuthStore((s) => s.user?.id);
+  const navigate = useNavigate();
+  const basePath = useBasePath();
   const { data: staff } = useQuery({ queryKey: ["staff"], queryFn: getStaff, enabled: isAdmin });
   const teachers = staff?.filter((s) => s.role === Role.TEACHER) ?? [];
   const { data: rooms } = useQuery({ queryKey: ["rooms"], queryFn: getRooms });
+  const { data: settings } = useQuery({ queryKey: ["tenant-settings"], queryFn: getTenantSettings });
+  const lessonColor = settings?.individualLessonColor ?? "#f59e0b";
 
   const [mode, setMode] = useState<ScheduleMode>("teacher");
   const [view, setView] = useState<ScheduleView>("week");
@@ -108,9 +210,18 @@ export default function SchedulePage() {
     enabled,
   });
 
+  const selectedRoom = mode === "room" ? rooms?.find((r) => r.id === roomId) : undefined;
+  const hourStart = selectedRoom ? Math.floor(timeStrToMinutes(selectedRoom.workingHoursStart) / 60) : DEFAULT_HOUR_START;
+  const hourEnd = selectedRoom ? Math.ceil(timeStrToMinutes(selectedRoom.workingHoursEnd) / 60) : DEFAULT_HOUR_END;
+
+  const goToLesson = (lesson: IndividualLessonDto) => navigate(`${basePath}/individual-lessons?edit=${lesson.id}`);
+
   const days =
     data && view !== "month"
-      ? Array.from({ length: view === "day" ? 1 : 7 }, (_, i) => addDays(data.rangeStart, i))
+      ? Array.from({ length: view === "day" ? 1 : 7 }, (_, i) => addDays(data.rangeStart, i)).map((d) => ({
+          date: d,
+          label: `${DAY_LABELS[(new Date(d).getDay() + 6) % 7]}, ${formatDayDate(d)}`,
+        }))
       : [];
 
   const monthDays =
@@ -124,28 +235,32 @@ export default function SchedulePage() {
         })()
       : [];
 
+  const items = data ? buildItems(data.groupOccurrences, data.individualLessons, lessonColor, goToLesson) : [];
+
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold text-slate-900">Расписание</h2>
 
-      <div className="flex flex-wrap gap-2">
-        {(["teacher", "student", "room"] as ScheduleMode[]).map((m) => (
-          <button
-            key={m}
-            onClick={() => setMode(m)}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
-              mode === m ? "bg-[var(--brand-primary)] text-white" : "border border-slate-300 text-slate-600"
-            }`}
-          >
-            {MODE_LABELS[m]}
-          </button>
-        ))}
-        <div className="ml-auto flex gap-2">
+      <div className="flex items-center justify-between gap-2 overflow-x-auto">
+        <div className="flex shrink-0 gap-2">
+          {(["teacher", "student", "room"] as ScheduleMode[]).map((m) => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium ${
+                mode === m ? "bg-[var(--brand-primary)] text-white" : "border border-slate-300 text-slate-600"
+              }`}
+            >
+              {MODE_LABELS[m]}
+            </button>
+          ))}
+        </div>
+        <div className="flex shrink-0 gap-2">
           {(["day", "week", "month"] as ScheduleView[]).map((v) => (
             <button
               key={v}
               onClick={() => setView(v)}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
+              className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium ${
                 view === v ? "bg-[var(--brand-primary)] text-white" : "border border-slate-300 text-slate-600"
               }`}
             >
@@ -231,21 +346,21 @@ export default function SchedulePage() {
         </div>
       )}
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-nowrap items-center justify-between gap-2">
         <button
           onClick={() => setDate((d) => shiftDate(d, view, -1))}
-          className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600"
+          className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600"
         >
           ← Пред.
         </button>
         {data && (
-          <span className="text-sm text-slate-500">
-            {formatDayDate(data.rangeStart)} – {formatDayDate(addDays(data.rangeEnd, -1))}
+          <span className="truncate text-sm text-slate-500">
+            {view === "day" ? formatDayDate(data.rangeStart) : `${formatDayDate(data.rangeStart)} – ${formatDayDate(addDays(data.rangeEnd, -1))}`}
           </span>
         )}
         <button
           onClick={() => setDate((d) => shiftDate(d, view, 1))}
-          className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600"
+          className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600"
         >
           След. →
         </button>
@@ -260,45 +375,23 @@ export default function SchedulePage() {
       )}
       {isLoading && <p className="text-slate-500">Загрузка…</p>}
 
-      {data && view !== "month" && (
-        <div className={view === "week" ? "space-y-3 lg:grid lg:grid-cols-7 lg:gap-3 lg:space-y-0" : "space-y-3"}>
-          {days.map((d, i) => (
-            <DayCard
-              key={d}
-              date={d}
-              label={
-                view === "day"
-                  ? `${DAY_LABELS[(new Date(d).getDay() + 6) % 7]}, ${formatDayDate(d)}`
-                  : `${DAY_LABELS[i]}, ${formatDayDate(d)}`
-              }
-              groupOccurrences={data.groupOccurrences}
-              individualLessons={data.individualLessons}
-            />
-          ))}
-        </div>
-      )}
+      {data && view !== "month" && <TimeGrid days={days} hourStart={hourStart} hourEnd={hourEnd} items={items} />}
 
       {data && view === "month" && (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">
           {monthDays.map((d) => {
-            const groupItems = data.groupOccurrences.filter((g) => g.date === d);
-            const lessonItems = data.individualLessons.filter((l) => l.startAt.slice(0, 10) === d);
-            const total = groupItems.length + lessonItems.length;
+            const dayItems = items.filter((it) => it.date === d);
             return (
-              <div key={d} className="min-h-[72px] rounded-lg border border-slate-200 bg-white p-2">
+              <div key={d} className="min-h-[76px] rounded-lg border border-slate-200 bg-white p-2">
                 <p className="text-xs font-semibold text-slate-500">{formatDayDate(d)}</p>
-                {total === 0 ? (
+                {dayItems.length === 0 ? (
                   <p className="mt-1 text-xs text-slate-300">—</p>
                 ) : (
                   <ul className="mt-1 space-y-0.5">
-                    {groupItems.map((g, i) => (
-                      <li key={`g${i}`} className="truncate text-xs text-slate-600">
-                        {g.startTime} {g.groupName}
-                      </li>
-                    ))}
-                    {lessonItems.map((l, i) => (
-                      <li key={`l${i}`} className="truncate text-xs text-slate-600">
-                        {new Date(l.startAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })} инд.
+                    {dayItems.map((item) => (
+                      <li key={item.key} className="flex items-center gap-1 truncate text-xs text-slate-600">
+                        <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: item.color }} />
+                        {item.title}
                       </li>
                     ))}
                   </ul>

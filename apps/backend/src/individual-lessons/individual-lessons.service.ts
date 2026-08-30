@@ -38,6 +38,7 @@ export function mapLesson(lesson: {
   createdAt: Date;
   roomId: string | null;
   room: { id: string; name: string } | null;
+  subject: string | null;
   participants: {
     id: string;
     studentId: string;
@@ -59,6 +60,7 @@ export function mapLesson(lesson: {
     createdAt: lesson.createdAt,
     roomId: lesson.roomId,
     roomName: lesson.room?.name ?? null,
+    subject: lesson.subject,
     participants: lesson.participants.map((p) => ({
       id: p.id,
       studentId: p.studentId,
@@ -126,6 +128,7 @@ export class IndividualLessonsService {
         createdAt: p.individualLesson.createdAt,
         roomId: p.individualLesson.roomId,
         roomName: p.individualLesson.room?.name ?? null,
+        subject: p.individualLesson.subject,
       },
     }));
   }
@@ -168,6 +171,7 @@ export class IndividualLessonsService {
         totalPrice,
         createdById: user.sub,
         roomId,
+        subject: dto.subject || null,
         participants: {
           create: uniqueStudentIds.map((studentId, i) => ({ studentId, shareAmount: shares[i] })),
         },
@@ -232,7 +236,13 @@ export class IndividualLessonsService {
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.individualLesson.update({
         where: { id: lessonId },
-        data: { startAt: newStartAt, durationMinutes: newDuration, totalPrice: newTotalPrice, roomId: newRoomId },
+        data: {
+          startAt: newStartAt,
+          durationMinutes: newDuration,
+          totalPrice: newTotalPrice,
+          roomId: newRoomId,
+          ...(dto.subject !== undefined ? { subject: dto.subject || null } : {}),
+        },
       });
       for (const s of shareUpdates) {
         await tx.individualLessonParticipant.update({ where: { id: s.id }, data: { shareAmount: s.shareAmount } });

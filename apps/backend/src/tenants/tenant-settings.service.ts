@@ -24,6 +24,7 @@ export class TenantSettingsService {
         telegramBotToken: null,
         primaryColor: null,
         logoUrl: null,
+        individualLessonColor: "#f59e0b",
       }
     );
   }

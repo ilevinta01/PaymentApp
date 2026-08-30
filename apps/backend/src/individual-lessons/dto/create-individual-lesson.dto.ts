@@ -20,4 +20,8 @@ export class CreateIndividualLessonDto {
   @IsOptional()
   @IsString()
   roomId?: string;
+
+  @IsOptional()
+  @IsString()
+  subject?: string;
 }

@@ -6,12 +6,12 @@ export async function getGroups(): Promise<GroupDto[]> {
   return data;
 }
 
-export async function createGroup(payload: { name: string; monthlyPrice: number }) {
+export async function createGroup(payload: { name: string; monthlyPrice: number; color?: string }) {
   const { data } = await apiClient.post<GroupDto>("/groups", payload);
   return data;
 }
 
-export async function updateGroup(id: string, payload: { name?: string; monthlyPrice?: number }) {
+export async function updateGroup(id: string, payload: { name?: string; monthlyPrice?: number; color?: string }) {
   const { data } = await apiClient.patch<GroupDto>(`/groups/${id}`, payload);
   return data;
 }

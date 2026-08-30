@@ -16,7 +16,12 @@ export class RoomsService {
 
   async create(tenantId: string, dto: CreateRoomDto) {
     return this.prisma.room.create({
-      data: { tenantId, name: dto.name },
+      data: {
+        tenantId,
+        name: dto.name,
+        ...(dto.workingHoursStart ? { workingHoursStart: dto.workingHoursStart } : {}),
+        ...(dto.workingHoursEnd ? { workingHoursEnd: dto.workingHoursEnd } : {}),
+      },
     });
   }
 

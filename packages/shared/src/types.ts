@@ -28,6 +28,7 @@ export interface TenantSettingsDto {
   telegramBotToken: string | null;
   primaryColor: string | null;
   logoUrl: string | null;
+  individualLessonColor: string;
 }
 
 export interface TelegramChatOptionDto {
@@ -41,6 +42,8 @@ export interface RoomDto {
   id: string;
   name: string;
   allowDoubleBooking: boolean;
+  workingHoursStart: string;
+  workingHoursEnd: string;
 }
 
 export interface GroupScheduleSlotDto {
@@ -57,6 +60,7 @@ export interface GroupDto {
   id: string;
   name: string;
   monthlyPrice: string;
+  color: string;
   scheduleSlots?: GroupScheduleSlotDto[];
   teachers?: { id: string; fullName: string }[];
 }
@@ -64,6 +68,7 @@ export interface GroupDto {
 export interface ScheduleGroupOccurrenceDto {
   groupId: string;
   groupName: string;
+  groupColor: string;
   date: string;
   startTime: string;
   endTime: string;
@@ -208,6 +213,7 @@ export interface IndividualLessonDto {
   createdAt: string;
   roomId: string | null;
   roomName: string | null;
+  subject: string | null;
   participants: IndividualLessonParticipantDto[];
   // Присутствует только в ответе на создание/изменение: не блокирующие предупреждения
   // о пересечении зала (когда у зала разрешено двойное бронирование).

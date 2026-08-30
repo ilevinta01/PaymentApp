@@ -1,53 +1,130 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { RoomDto } from "@oplata/shared";
 import { getTenantSettings, updateTenantSettings } from "../../api/tenantSettings";
 import { createRoom, deleteRoom, getRooms, updateRoom } from "../../api/rooms";
+
+function RoomRow({ room, onChanged }: { room: RoomDto; onChanged: () => void }) {
+  const [start, setStart] = useState(room.workingHoursStart);
+  const [end, setEnd] = useState(room.workingHoursEnd);
+
+  const hoursMutation = useMutation({
+    mutationFn: () => updateRoom(room.id, { workingHoursStart: start, workingHoursEnd: end }),
+    onSuccess: onChanged,
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: (allowDoubleBooking: boolean) => updateRoom(room.id, { allowDoubleBooking }),
+    onSuccess: onChanged,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteRoom(room.id),
+    onSuccess: onChanged,
+  });
+
+  const hoursChanged = start !== room.workingHoursStart || end !== room.workingHoursEnd;
+
+  return (
+    <li className="space-y-2 px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="font-medium text-slate-800">{room.name}</span>
+        <button
+          onClick={() => {
+            if (confirm(`Удалить зал «${room.name}»?`)) deleteMutation.mutate();
+          }}
+          className="text-sm font-medium text-red-600"
+        >
+          Удалить
+        </button>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+        <span>Часы работы:</span>
+        <input
+          type="time"
+          value={start}
+          onChange={(e) => setStart(e.target.value)}
+          className="rounded-lg border border-slate-300 px-2 py-1"
+        />
+        <span className="text-slate-400">–</span>
+        <input
+          type="time"
+          value={end}
+          onChange={(e) => setEnd(e.target.value)}
+          className="rounded-lg border border-slate-300 px-2 py-1"
+        />
+        {hoursChanged && (
+          <button
+            onClick={() => hoursMutation.mutate()}
+            disabled={hoursMutation.isPending}
+            className="rounded-lg bg-[var(--brand-primary)] px-3 py-1 text-xs font-medium text-white disabled:opacity-60"
+          >
+            Сохранить
+          </button>
+        )}
+      </div>
+      <label className="flex items-center gap-2 text-sm text-slate-600">
+        <input
+          type="checkbox"
+          checked={room.allowDoubleBooking}
+          onChange={(e) => toggleMutation.mutate(e.target.checked)}
+          className="h-4 w-4"
+        />
+        Разрешить двойное бронирование
+      </label>
+    </li>
+  );
+}
 
 function RoomsSection() {
   const queryClient = useQueryClient();
   const { data: rooms } = useQuery({ queryKey: ["rooms"], queryFn: getRooms });
   const [name, setName] = useState("");
+  const [start, setStart] = useState("09:00");
+  const [end, setEnd] = useState("21:00");
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["rooms"] });
 
   const createMutation = useMutation({
-    mutationFn: () => createRoom({ name }),
+    mutationFn: () => createRoom({ name, workingHoursStart: start, workingHoursEnd: end }),
     onSuccess: () => {
       setName("");
       invalidate();
     },
   });
 
-  const toggleMutation = useMutation({
-    mutationFn: ({ id, allowDoubleBooking }: { id: string; allowDoubleBooking: boolean }) =>
-      updateRoom(id, { allowDoubleBooking }),
-    onSuccess: invalidate,
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => deleteRoom(id),
-    onSuccess: invalidate,
-  });
-
   return (
     <div className="space-y-2">
       <h2 className="text-lg font-semibold text-slate-900">Залы / классы</h2>
       <p className="text-sm text-slate-500">
-        Если у зала выключено «Разрешить двойное бронирование», при пересечении с другим занятием в этом зале
-        система не даст создать запись. Иначе будет показано лишь предупреждение — решение остаётся за пользователем.
+        Часы работы зала используются как границы сетки в расписании. Если у зала выключено «Разрешить двойное
+        бронирование», при пересечении с другим занятием система не даст создать запись — иначе будет показано
+        лишь предупреждение, решение остаётся за пользователем.
       </p>
       <form
         onSubmit={(e) => {
           e.preventDefault();
           if (name.trim()) createMutation.mutate();
         }}
-        className="flex gap-2"
+        className="flex flex-wrap gap-2"
       >
         <input
           placeholder="Название зала"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="flex-1 rounded-lg border border-slate-300 px-3 py-2"
+          className="min-w-[160px] flex-1 rounded-lg border border-slate-300 px-3 py-2"
+        />
+        <input
+          type="time"
+          value={start}
+          onChange={(e) => setStart(e.target.value)}
+          className="rounded-lg border border-slate-300 px-2 py-2"
+        />
+        <input
+          type="time"
+          value={end}
+          onChange={(e) => setEnd(e.target.value)}
+          className="rounded-lg border border-slate-300 px-2 py-2"
         />
         <button
           disabled={createMutation.isPending || !name.trim()}
@@ -58,26 +135,7 @@ function RoomsSection() {
       </form>
       <ul className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white">
         {rooms?.map((room) => (
-          <li key={room.id} className="flex items-center justify-between gap-2 px-4 py-3">
-            <span className="font-medium text-slate-800">{room.name}</span>
-            <label className="flex items-center gap-2 text-sm text-slate-600">
-              <input
-                type="checkbox"
-                checked={room.allowDoubleBooking}
-                onChange={(e) => toggleMutation.mutate({ id: room.id, allowDoubleBooking: e.target.checked })}
-                className="h-4 w-4"
-              />
-              Разрешить двойное бронирование
-            </label>
-            <button
-              onClick={() => {
-                if (confirm(`Удалить зал «${room.name}»?`)) deleteMutation.mutate(room.id);
-              }}
-              className="text-sm font-medium text-red-600"
-            >
-              Удалить
-            </button>
-          </li>
+          <RoomRow key={room.id} room={room} onChanged={invalidate} />
         ))}
         {rooms?.length === 0 && <li className="px-4 py-4 text-slate-500">Залы ещё не добавлены</li>}
       </ul>
@@ -89,13 +147,23 @@ export default function SettingsPage() {
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["tenant-settings"], queryFn: getTenantSettings });
   const [token, setToken] = useState("");
+  const [lessonColor, setLessonColor] = useState("#f59e0b");
 
   useEffect(() => {
     setToken(data?.telegramBotToken ?? "");
   }, [data?.telegramBotToken]);
 
+  useEffect(() => {
+    if (data?.individualLessonColor) setLessonColor(data.individualLessonColor);
+  }, [data?.individualLessonColor]);
+
   const tokenMutation = useMutation({
     mutationFn: () => updateTenantSettings({ telegramBotToken: token }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tenant-settings"] }),
+  });
+
+  const lessonColorMutation = useMutation({
+    mutationFn: () => updateTenantSettings({ individualLessonColor: lessonColor }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tenant-settings"] }),
   });
 
@@ -151,6 +219,31 @@ export default function SettingsPage() {
           </p>
         )}
       </div>
+
+      {data?.isIndividualLessonsEnabled && (
+        <div className="space-y-2">
+          <h2 className="text-lg font-semibold text-slate-900">Цвет индивидуальных занятий</h2>
+          <p className="text-sm text-slate-500">
+            Единый цвет для всех индивидуальных занятий в расписании — у каждой группы свой цвет задаётся на
+            странице самой группы.
+          </p>
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              value={lessonColor}
+              onChange={(e) => setLessonColor(e.target.value)}
+              className="h-9 w-14 cursor-pointer rounded border-0 bg-transparent p-0"
+            />
+            <button
+              onClick={() => lessonColorMutation.mutate()}
+              disabled={lessonColorMutation.isPending || lessonColor === data?.individualLessonColor}
+              className="rounded-lg bg-[var(--brand-primary)] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60"
+            >
+              Сохранить
+            </button>
+          </div>
+        </div>
+      )}
 
       {data?.isScheduleEnabled && <RoomsSection />}
     </div>

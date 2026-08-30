@@ -185,12 +185,14 @@ export default function GroupDetailPage() {
 
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
+  const [color, setColor] = useState("#6366f1");
   const [teacherIds, setTeacherIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (group) {
       setName(group.name);
       setPrice(group.monthlyPrice);
+      setColor(group.color);
       setTeacherIds(group.teachers?.map((t) => t.id) ?? []);
     }
   }, [group]);
@@ -199,7 +201,7 @@ export default function GroupDetailPage() {
   const invalidateStudents = () => queryClient.invalidateQueries({ queryKey: ["students", { groupId }] });
 
   const saveMutation = useMutation({
-    mutationFn: () => updateGroup(groupId!, { name, monthlyPrice: Number(price) }),
+    mutationFn: () => updateGroup(groupId!, { name, monthlyPrice: Number(price), color }),
     onSuccess: invalidateGroups,
   });
 
@@ -241,6 +243,17 @@ export default function GroupDetailPage() {
               onChange={(e) => setPrice(e.target.value)}
               className="w-28 rounded-lg border border-slate-300 px-3 py-2"
             />
+            {settings?.isScheduleEnabled && (
+              <label className="flex items-center gap-2 rounded-lg border border-slate-300 px-2 py-1 text-sm text-slate-600">
+                Цвет
+                <input
+                  type="color"
+                  value={color}
+                  onChange={(e) => setColor(e.target.value)}
+                  className="h-7 w-10 cursor-pointer rounded border-0 bg-transparent p-0"
+                />
+              </label>
+            )}
             <button
               onClick={() => saveMutation.mutate()}
               disabled={saveMutation.isPending || !name.trim()}

@@ -14,4 +14,8 @@ export class UpdateIndividualLessonDto {
   @IsOptional()
   @IsString()
   roomId?: string;
+
+  @IsOptional()
+  @IsString()
+  subject?: string;
 }

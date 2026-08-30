@@ -59,6 +59,10 @@ model Room {
   tenant             Tenant   @relation(fields: [tenantId], references: [id])
   name               String
   allowDoubleBooking Boolean  @default(true)
+  // Часы работы зала — используются как границы сетки в расписании (визуально показываем
+  // только это окно); задаются при создании, администратор может их менять позже.
+  workingHoursStart  String   @default("09:00")
+  workingHoursEnd    String   @default("21:00")
   createdAt          DateTime @default(now())
 
   scheduleSlots     GroupScheduleSlot[]
@@ -79,6 +83,9 @@ model TenantSettings {
   telegramBotToken         String?
   primaryColor             String?
   logoUrl                  String?
+  // Единый цвет всех индивидуальных занятий в расписании (у групп цвет свой у каждой,
+  // см. Group.color) — задаётся администратором тенанта в настройках.
+  individualLessonColor    String  @default("#f59e0b")
 }
 
 // Глобальный (не привязанный к тенанту) прайс-лист платных функций — задаётся владельцем
@@ -126,6 +133,8 @@ model Group {
   tenant       Tenant   @relation(fields: [tenantId], references: [id])
   name         String
   monthlyPrice Decimal  @db.Decimal(10, 2)
+  // Цвет группы в расписании — задаётся администратором, чтобы визуально отличать группы.
+  color        String   @default("#6366f1")
   createdAt    DateTime @default(now())
 
   // Группу может вести несколько преподавателей одновременно; Супер-Админ
@@ -232,6 +241,9 @@ model IndividualLesson {
   createdAt         DateTime @default(now())
   roomId            String?
   room              Room?    @relation(fields: [roomId], references: [id])
+  // Необязательное произвольное описание типа занятия (математика, латино, балет и т.п.),
+  // вводится вручную преподавателем/админом при создании.
+  subject           String?
 
   participants IndividualLessonParticipant[]
 

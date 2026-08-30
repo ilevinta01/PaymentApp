@@ -6,12 +6,15 @@ export async function getRooms(): Promise<RoomDto[]> {
   return data;
 }
 
-export async function createRoom(payload: { name: string }) {
+export async function createRoom(payload: { name: string; workingHoursStart?: string; workingHoursEnd?: string }) {
   const { data } = await apiClient.post<RoomDto>("/rooms", payload);
   return data;
 }
 
-export async function updateRoom(id: string, payload: { name?: string; allowDoubleBooking?: boolean }) {
+export async function updateRoom(
+  id: string,
+  payload: { name?: string; allowDoubleBooking?: boolean; workingHoursStart?: string; workingHoursEnd?: string },
+) {
   const { data } = await apiClient.patch<RoomDto>(`/rooms/${id}`, payload);
   return data;
 }
