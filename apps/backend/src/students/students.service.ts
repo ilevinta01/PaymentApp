@@ -1,7 +1,8 @@
 import { ForbiddenException, BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import { JwtPayload, Role } from "@oplata/shared";
+import { JwtPayload, PaymentMethod, Role } from "@oplata/shared";
 import { getCurrentPeriodMonth } from "../common/period";
 import { PrismaService } from "../prisma/prisma.service";
+import { TelegramService } from "../telegram/telegram.service";
 import { CreateStudentDto } from "./dto/create-student.dto";
 import { DepositBalanceDto } from "./dto/deposit-balance.dto";
 import { UpdateStudentDto } from "./dto/update-student.dto";
@@ -11,9 +12,17 @@ const WITH_GROUP = {
   group: { select: { id: true, name: true, monthlyPrice: true } },
 } as const;
 
+const METHOD_LABEL: Record<PaymentMethod, string> = {
+  [PaymentMethod.CASH]: "Наличные",
+  [PaymentMethod.CARD]: "Карта",
+};
+
 @Injectable()
 export class StudentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly telegram: TelegramService,
+  ) {}
 
   // Преподаватель видит только учеников своих групп, Супер-Админ — всех учеников тенанта.
   async findAllForUser(
@@ -127,11 +136,10 @@ export class StudentsService {
     const student = await this.prisma.student.findFirst({ where: { id: studentId, tenantId } });
     if (!student) throw new NotFoundException("Ученик не найден");
 
-    if (dto.paymentMethod === "CARD") {
-      const settings = await this.prisma.tenantSettings.findUnique({ where: { tenantId } });
-      if (!settings?.isCardEnabled) {
-        throw new ForbiddenException("Оплата картой не включена в настройках детского центра");
-      }
+    const settings = await this.prisma.tenantSettings.findUnique({ where: { tenantId } });
+
+    if (dto.paymentMethod === "CARD" && !settings?.isCardEnabled) {
+      throw new ForbiddenException("Оплата картой не включена в настройках детского центра");
     }
 
     const [, updated] = await this.prisma.$transaction([
@@ -152,6 +160,19 @@ export class StudentsService {
         include: WITH_GROUP,
       }),
     ]);
+
+    if (settings?.isTelegramEnabled && settings.telegramBotToken && student.parentTelegramChatId) {
+      const collector = await this.prisma.user.findUnique({ where: { id: user.sub }, select: { fullName: true } });
+      const text = [
+        "Пополнение баланса (аванс)",
+        `Ученик: ${student.fullName}`,
+        `Сумма: ${dto.amount}`,
+        `Способ: ${METHOD_LABEL[dto.paymentMethod]}`,
+        `Новый баланс: ${updated.balance}`,
+        `Принял(а): ${collector?.fullName ?? "—"}`,
+      ].join("\n");
+      await this.telegram.sendMessage(settings.telegramBotToken, student.parentTelegramChatId, text);
+    }
 
     return (await this.withPaidStatus(tenantId, [updated]))[0];
   }
