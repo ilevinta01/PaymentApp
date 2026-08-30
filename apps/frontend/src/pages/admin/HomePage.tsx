@@ -12,6 +12,9 @@ export default function HomePage() {
         </div>
       )}
       <div className="grid grid-cols-2 gap-4">
+        <div className="col-span-2">
+          <BigButton to="/admin/payment" label="Оплата" hint="принять оплату от ученика" />
+        </div>
         <BigButton to="/admin/groups" label="Группы" />
         <BigButton to="/admin/search" label="Ученики" hint="поиск и добавление" />
         <BigButton to="/admin/reports" label="Отчёты" />

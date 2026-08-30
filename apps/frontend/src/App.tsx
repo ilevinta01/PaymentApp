@@ -13,6 +13,7 @@ import StudentDetailPage from "./pages/shared/StudentDetailPage";
 import SearchStudentPage from "./pages/shared/SearchStudentPage";
 import IndividualLessonsPage from "./pages/shared/IndividualLessonsPage";
 import SchedulePage from "./pages/shared/SchedulePage";
+import PaymentQuickPage from "./pages/shared/PaymentQuickPage";
 import AddStudentPage from "./pages/admin/AddStudentPage";
 import ReportsPage from "./pages/admin/ReportsPage";
 import TeacherEarningsPage from "./pages/admin/TeacherEarningsPage";
@@ -44,6 +45,7 @@ export default function App() {
             <Route path="search" element={<SearchStudentPage />} />
             <Route path="individual-lessons" element={<IndividualLessonsPage />} />
             <Route path="schedule" element={<SchedulePage />} />
+            <Route path="payment" element={<PaymentQuickPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="reports/payments" element={<PaymentsPage />} />
             <Route path="reports/payments-report" element={<PaymentsReportPage />} />
@@ -66,6 +68,7 @@ export default function App() {
             <Route path="search" element={<SearchStudentPage />} />
             <Route path="individual-lessons" element={<IndividualLessonsPage />} />
             <Route path="schedule" element={<SchedulePage />} />
+            <Route path="payment" element={<PaymentQuickPage />} />
           </Route>
         </Route>
 

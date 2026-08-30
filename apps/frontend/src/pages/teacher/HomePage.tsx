@@ -12,6 +12,9 @@ export default function HomePage() {
         </div>
       )}
       <div className="grid grid-cols-2 gap-4">
+        <div className="col-span-2">
+          <BigButton to="/teacher/payment" label="Оплата" hint="принять оплату от ученика" />
+        </div>
         <BigButton to="/teacher/groups" label="Группы" />
         <BigButton to="/teacher/search" label="Поиск ученика" />
         {settings?.isIndividualLessonsEnabled && (
