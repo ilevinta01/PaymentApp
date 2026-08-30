@@ -27,14 +27,18 @@ function startOfMonth(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), 1);
 }
 
+// "YYYY-MM-DD" через new Date(...)/toISOString() проходит через UTC, а весь остальной код здесь
+// (getDay/setHours) работает в локальном времени сервера. Для часового пояса ВОСТОЧНЕЕ UTC
+// (например, Молдова, UTC+3) toISOString() у локальной полуночи откатывает дату на день назад —
+// именно поэтому Monday-старт недели "съезжал" на воскресенье. Читаем/пишем дату вручную по
+// локальным компонентам, не заходя в UTC вообще.
 function toDateString(date: Date): string {
-  return date.toISOString().slice(0, 10);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
-// "YYYY-MM-DD" через new Date(...) парсится как UTC-полночь, а весь остальной код здесь
-// (getDay/setHours) работает в локальном времени сервера — на машине с часовым поясом
-// западнее UTC это сдвигало день недели на -1 (неделя внезапно начиналась с воскресенья).
-// Разбираем строку вручную, чтобы получить локальную календарную дату без сдвига.
 function parseLocalDate(dateStr: string): Date {
   const [y, m, d] = dateStr.split("-").map(Number);
   return new Date(y, m - 1, d);
