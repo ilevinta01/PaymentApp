@@ -1,4 +1,4 @@
-import { ArrayMinSize, IsArray, IsDateString, IsInt, IsOptional, IsString, Min } from "class-validator";
+import { ArrayMinSize, IsArray, IsBoolean, IsDateString, IsInt, IsOptional, IsString, Min } from "class-validator";
 
 export class CreateIndividualLessonDto {
   @IsOptional()
@@ -24,4 +24,8 @@ export class CreateIndividualLessonDto {
   @IsOptional()
   @IsString()
   subject?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  confirmStudentConflict?: boolean;
 }

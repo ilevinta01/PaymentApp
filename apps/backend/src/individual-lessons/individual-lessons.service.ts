@@ -155,7 +155,26 @@ export class IndividualLessonsService {
       if (!room) throw new NotFoundException("Зал не найден");
     }
 
+    const studentConflicts = await this.findStudentGroupConflicts(
+      tenantId,
+      uniqueStudentIds,
+      new Date(dto.startAt),
+      dto.durationMinutes,
+    );
+    if (studentConflicts.length > 0 && !dto.confirmStudentConflict) {
+      throw new ConflictException({
+        statusCode: 409,
+        requiresConfirmation: true,
+        message: `Пересечение с расписанием группы у ${studentConflicts.map((c) => `«${c.studentName}» (группа «${c.groupName}»)`).join(", ")}. Всё равно создать занятие?`,
+      });
+    }
+
     const warnings = await this.assertNoConflict(tenantId, teacherId, new Date(dto.startAt), dto.durationMinutes, roomId);
+    warnings.push(
+      ...studentConflicts.map(
+        (c) => `У «${c.studentName}» это время пересекается с расписанием группы «${c.groupName}» — родитель уведомлён`,
+      ),
+    );
 
     const hourlyRate = Number(teacher.individualLessonRate);
     const totalPrice = Math.round(hourlyRate * (dto.durationMinutes / 60) * 100) / 100;
@@ -179,7 +198,7 @@ export class IndividualLessonsService {
       include: WITH_DETAILS,
     });
 
-    await this.sendNotifications(tenantId, lesson, "created");
+    await this.sendNotifications(tenantId, lesson, "created", studentConflicts);
 
     return { ...mapLesson(lesson), warnings };
   }
@@ -202,6 +221,22 @@ export class IndividualLessonsService {
     }
 
     let warnings: string[] = [];
+    let studentConflicts: { studentId: string; studentName: string; groupName: string }[] = [];
+    if (dto.startAt !== undefined || dto.durationMinutes !== undefined) {
+      studentConflicts = await this.findStudentGroupConflicts(
+        tenantId,
+        lesson.participants.map((p) => p.studentId),
+        newStartAt,
+        newDuration,
+      );
+      if (studentConflicts.length > 0 && !dto.confirmStudentConflict) {
+        throw new ConflictException({
+          statusCode: 409,
+          requiresConfirmation: true,
+          message: `Пересечение с расписанием группы у ${studentConflicts.map((c) => `«${c.studentName}» (группа «${c.groupName}»)`).join(", ")}. Всё равно изменить занятие?`,
+        });
+      }
+    }
     if (dto.startAt !== undefined || dto.durationMinutes !== undefined || dto.roomId !== undefined) {
       warnings = await this.assertNoConflict(
         tenantId,
@@ -210,6 +245,11 @@ export class IndividualLessonsService {
         newDuration,
         newRoomId ?? undefined,
         lessonId,
+      );
+      warnings.push(
+        ...studentConflicts.map(
+          (c) => `У «${c.studentName}» это время пересекается с расписанием группы «${c.groupName}» — родитель уведомлён`,
+        ),
       );
     }
 
@@ -250,7 +290,7 @@ export class IndividualLessonsService {
       return tx.individualLesson.findUniqueOrThrow({ where: { id: lessonId }, include: WITH_DETAILS });
     });
 
-    await this.sendNotifications(tenantId, updated, "updated");
+    await this.sendNotifications(tenantId, updated, "updated", studentConflicts);
 
     return { ...mapLesson(updated), warnings };
   }
@@ -388,6 +428,33 @@ export class IndividualLessonsService {
     return warnings;
   }
 
+  // Проверяет, не пересекается ли новое/изменённое время индивидуального занятия с расписанием
+  // СОБСТВЕННОЙ группы каждого ученика-участника. В отличие от конфликтов преподавателя это не
+  // жёсткий блок: администратор явно подтверждает пересечение (dto.confirmStudentConflict), а
+  // родителю дополнительно отправляется предупреждение в Telegram.
+  private async findStudentGroupConflicts(
+    tenantId: string,
+    studentIds: string[],
+    startAt: Date,
+    durationMinutes: number,
+  ): Promise<{ studentId: string; studentName: string; groupName: string }[]> {
+    const dayOfWeek = startAt.getDay();
+    const startMinutes = startAt.getHours() * 60 + startAt.getMinutes();
+    const endMinutes = startMinutes + durationMinutes;
+
+    const students = await this.prisma.student.findMany({
+      where: { id: { in: studentIds }, tenantId },
+      include: { group: { include: { scheduleSlots: { where: { dayOfWeek } } } } },
+    });
+
+    const conflicts: { studentId: string; studentName: string; groupName: string }[] = [];
+    for (const student of students) {
+      const slot = student.group.scheduleSlots.find((s) => s.startMinutes < endMinutes && startMinutes < s.endMinutes);
+      if (slot) conflicts.push({ studentId: student.id, studentName: student.fullName, groupName: student.group.name });
+    }
+    return conflicts;
+  }
+
   private async sendNotifications(
     tenantId: string,
     lesson: {
@@ -398,6 +465,7 @@ export class IndividualLessonsService {
       participants: { shareAmount: unknown; student: { id: string; fullName: string } }[];
     },
     kind: "created" | "updated",
+    studentConflicts: { studentId: string; groupName: string }[] = [],
   ) {
     const settings = await this.prisma.tenantSettings.findUnique({ where: { tenantId } });
     if (!settings?.isTelegramEnabled || !settings.telegramBotToken) return;
@@ -426,6 +494,7 @@ export class IndividualLessonsService {
     for (const participant of lesson.participants) {
       const student = students.find((s) => s.id === participant.student.id);
       if (!student?.parentTelegramChatId) continue;
+      const conflict = studentConflicts.find((c) => c.studentId === student.id);
       const text = [
         parentHeader,
         `Ученик: ${student.fullName}`,
@@ -433,6 +502,7 @@ export class IndividualLessonsService {
         `Дата и время: ${when}`,
         `Длительность: ${lesson.durationMinutes} мин`,
         `Ваша часть оплаты: ${participant.shareAmount}`,
+        ...(conflict ? [`⚠ Внимание: это время пересекается с занятием группы «${conflict.groupName}»`] : []),
       ].join("\n");
       await this.telegram.sendMessage(settings.telegramBotToken, student.parentTelegramChatId, text);
     }

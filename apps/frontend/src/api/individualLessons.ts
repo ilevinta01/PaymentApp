@@ -20,6 +20,7 @@ export async function createIndividualLesson(payload: {
   durationMinutes: number;
   roomId?: string;
   subject?: string;
+  confirmStudentConflict?: boolean;
 }): Promise<IndividualLessonDto> {
   const { data } = await apiClient.post<IndividualLessonDto>("/individual-lessons", payload);
   return data;
@@ -32,7 +33,13 @@ export async function markIndividualLessonParticipantPaid(participantId: string,
 
 export async function updateIndividualLesson(
   lessonId: string,
-  payload: { startAt?: string; durationMinutes?: number; roomId?: string; subject?: string },
+  payload: {
+    startAt?: string;
+    durationMinutes?: number;
+    roomId?: string;
+    subject?: string;
+    confirmStudentConflict?: boolean;
+  },
 ): Promise<IndividualLessonDto> {
   const { data } = await apiClient.patch<IndividualLessonDto>(`/individual-lessons/${lessonId}`, payload);
   return data;

@@ -1,4 +1,4 @@
-import { IsDateString, IsInt, IsOptional, IsString, Min } from "class-validator";
+import { IsBoolean, IsDateString, IsInt, IsOptional, IsString, Min } from "class-validator";
 
 export class UpdateIndividualLessonDto {
   @IsOptional()
@@ -18,4 +18,8 @@ export class UpdateIndividualLessonDto {
   @IsOptional()
   @IsString()
   subject?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  confirmStudentConflict?: boolean;
 }

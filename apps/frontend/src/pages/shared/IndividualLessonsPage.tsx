@@ -26,6 +26,18 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+// Пересечение с расписанием группы у ученика не блокируется намертво (в отличие от преподавателя) —
+// бэкенд отвечает 409 с requiresConfirmation:true, и админ/преподаватель подтверждает создание
+// диалогом confirm(), после чего запрос повторяется с confirmStudentConflict:true.
+function getConfirmationRequest(error: unknown): string | null {
+  if (error && typeof error === "object" && "response" in error) {
+    const data = (error as { response?: { data?: { requiresConfirmation?: boolean; message?: string } } }).response
+      ?.data;
+    if (data?.requiresConfirmation && typeof data.message === "string") return data.message;
+  }
+  return null;
+}
+
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
 const MINUTES = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, "0"));
 
@@ -45,6 +57,7 @@ function CreateLessonForm({ onCreated, showRooms }: { onCreated: () => void; sho
   const [roomId, setRoomId] = useState("");
   const [subject, setSubject] = useState("");
   const [warnings, setWarnings] = useState<string[]>([]);
+  const forceConfirmRef = useRef(false);
 
   const trimmedQuery = studentQuery.trim();
   const { data: foundStudents } = useQuery({
@@ -62,8 +75,10 @@ function CreateLessonForm({ onCreated, showRooms }: { onCreated: () => void; sho
         durationMinutes,
         roomId: roomId || undefined,
         subject: subject.trim() || undefined,
+        confirmStudentConflict: forceConfirmRef.current,
       }),
     onSuccess: (result) => {
+      forceConfirmRef.current = false;
       onCreated();
       setWarnings(result.warnings ?? []);
       setTeacherId("");
@@ -74,6 +89,15 @@ function CreateLessonForm({ onCreated, showRooms }: { onCreated: () => void; sho
       setDurationMinutes(60);
       setRoomId("");
       setSubject("");
+    },
+    onError: (error) => {
+      const confirmMessage = getConfirmationRequest(error);
+      if (confirmMessage && window.confirm(confirmMessage)) {
+        forceConfirmRef.current = true;
+        mutation.mutate();
+      } else {
+        forceConfirmRef.current = false;
+      }
     },
   });
 
@@ -263,6 +287,7 @@ function EditLessonForm({
   const [roomId, setRoomId] = useState(lesson.roomId ?? "");
   const [subject, setSubject] = useState(lesson.subject ?? "");
   const { data: rooms } = useQuery({ queryKey: ["rooms"], queryFn: getRooms, enabled: showRooms });
+  const forceConfirmRef = useRef(false);
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -271,10 +296,21 @@ function EditLessonForm({
         durationMinutes,
         roomId,
         subject: subject.trim(),
+        confirmStudentConflict: forceConfirmRef.current,
       }),
     onSuccess: (result) => {
+      forceConfirmRef.current = false;
       onWarnings(result.warnings ?? []);
       onDone();
+    },
+    onError: (error) => {
+      const confirmMessage = getConfirmationRequest(error);
+      if (confirmMessage && window.confirm(confirmMessage)) {
+        forceConfirmRef.current = true;
+        mutation.mutate();
+      } else {
+        forceConfirmRef.current = false;
+      }
     },
   });
 
