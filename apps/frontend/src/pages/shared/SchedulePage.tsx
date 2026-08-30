@@ -241,33 +241,32 @@ export default function SchedulePage() {
     <div className="space-y-4">
       <h2 className="text-lg font-semibold text-slate-900">Расписание</h2>
 
-      <div className="flex items-center justify-between gap-2 overflow-x-auto">
-        <div className="flex shrink-0 gap-2">
-          {(["teacher", "student", "room"] as ScheduleMode[]).map((m) => (
-            <button
-              key={m}
-              onClick={() => setMode(m)}
-              className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium ${
-                mode === m ? "bg-[var(--brand-primary)] text-white" : "border border-slate-300 text-slate-600"
-              }`}
-            >
-              {MODE_LABELS[m]}
-            </button>
-          ))}
-        </div>
-        <div className="flex shrink-0 gap-2">
-          {(["day", "week", "month"] as ScheduleView[]).map((v) => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium ${
-                view === v ? "bg-[var(--brand-primary)] text-white" : "border border-slate-300 text-slate-600"
-              }`}
-            >
-              {VIEW_LABELS[v]}
-            </button>
-          ))}
-        </div>
+      <div className="flex flex-nowrap gap-2 overflow-x-auto">
+        {(["teacher", "student", "room"] as ScheduleMode[]).map((m) => (
+          <button
+            key={m}
+            onClick={() => setMode(m)}
+            className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium ${
+              mode === m ? "bg-[var(--brand-primary)] text-white" : "border border-slate-300 text-slate-600"
+            }`}
+          >
+            {MODE_LABELS[m]}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex flex-nowrap gap-2 overflow-x-auto">
+        {(["day", "week", "month"] as ScheduleView[]).map((v) => (
+          <button
+            key={v}
+            onClick={() => setView(v)}
+            className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium ${
+              view === v ? "bg-[var(--brand-primary)] text-white" : "border border-slate-300 text-slate-600"
+            }`}
+          >
+            {VIEW_LABELS[v]}
+          </button>
+        ))}
       </div>
 
       {mode === "teacher" && isAdmin && (
