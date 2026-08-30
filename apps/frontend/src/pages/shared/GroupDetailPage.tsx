@@ -16,6 +16,59 @@ const STATUS_LABELS: Record<StudentStatus, string> = {
   [StudentStatus.PAUSE]: "Перерыв",
 };
 
+function TeachersDropdown({
+  teachers,
+  selectedIds,
+  onChange,
+}: {
+  teachers: { id: string; fullName: string }[];
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selectedNames = teachers.filter((t) => selectedIds.includes(t.id)).map((t) => t.fullName);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-2 rounded-lg border border-slate-300 px-3 py-2 text-left text-sm"
+      >
+        <span className={selectedNames.length ? "text-slate-800" : "text-slate-400"}>
+          {selectedNames.length ? selectedNames.join(", ") : "Выберите преподавателя (можно несколько)"}
+        </span>
+        <span className="text-slate-400">{open ? "▲" : "▼"}</span>
+      </button>
+      {open && (
+        <div className="absolute z-10 mt-1 w-full rounded-lg border border-slate-200 bg-white p-2 shadow-lg">
+          {teachers.map((t) => (
+            <label key={t.id} className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm active:bg-slate-50">
+              <input
+                type="checkbox"
+                checked={selectedIds.includes(t.id)}
+                onChange={() =>
+                  onChange(selectedIds.includes(t.id) ? selectedIds.filter((id) => id !== t.id) : [...selectedIds, t.id])
+                }
+                className="h-4 w-4"
+              />
+              {t.fullName}
+            </label>
+          ))}
+          {teachers.length === 0 && <p className="px-2 py-2 text-sm text-slate-400">Преподавателей пока нет</p>}
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="mt-1 w-full rounded-lg bg-slate-100 py-1.5 text-sm font-medium text-slate-700"
+          >
+            Готово
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StudentRow({
   student,
   groups,
@@ -178,31 +231,7 @@ export default function GroupDetailPage() {
 
           <div className="space-y-2">
             <p className="text-sm font-medium text-slate-700">Преподаватели</p>
-            <div className="flex flex-wrap gap-2">
-              {teachers.map((t) => (
-                <label
-                  key={t.id}
-                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm ${
-                    teacherIds.includes(t.id)
-                      ? "border-[var(--brand-primary)] bg-[var(--brand-primary-light)] text-[var(--brand-primary-dark)]"
-                      : "border-slate-300 text-slate-600"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={teacherIds.includes(t.id)}
-                    onChange={() =>
-                      setTeacherIds((ids) =>
-                        ids.includes(t.id) ? ids.filter((id) => id !== t.id) : [...ids, t.id],
-                      )
-                    }
-                    className="h-3.5 w-3.5"
-                  />
-                  {t.fullName}
-                </label>
-              ))}
-              {teachers.length === 0 && <p className="text-sm text-slate-400">Преподавателей пока нет</p>}
-            </div>
+            <TeachersDropdown teachers={teachers} selectedIds={teacherIds} onChange={setTeacherIds} />
             <button
               onClick={() => teachersMutation.mutate()}
               disabled={teachersMutation.isPending}
