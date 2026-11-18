@@ -1,0 +1,15 @@
+name: Keep alive
+
+# Бесплатный Supabase засыпает после недели без запросов, а бесплатный Render — через 15 минут.
+# /health делает SELECT 1 в базе, так что один пинг держит бодрыми и сервер, и базу.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping backend /health
+        run: curl --fail --silent --show-error --retry 3 --retry-delay 20 --max-time 90 https://paymentapp-h4ck.onrender.com/health
