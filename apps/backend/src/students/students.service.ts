@@ -2,7 +2,7 @@ import { ForbiddenException, BadRequestException, Injectable, NotFoundException 
 import { JwtPayload, PaymentMethod, Role } from "@oplata/shared";
 import { getCurrentPeriodMonth } from "../common/period";
 import { PrismaService } from "../prisma/prisma.service";
-import { TelegramService } from "../telegram/telegram.service";
+import { TelegramBotService, ConsentStatus } from "../telegram/telegram-bot.service";
 import { CreateStudentDto } from "./dto/create-student.dto";
 import { DepositBalanceDto } from "./dto/deposit-balance.dto";
 import { UpdateStudentDto } from "./dto/update-student.dto";
@@ -21,7 +21,7 @@ const METHOD_LABEL: Record<PaymentMethod, string> = {
 export class StudentsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly telegram: TelegramService,
+    private readonly telegramBot: TelegramBotService,
   ) {}
 
   // Преподаватель видит только учеников своих групп, Супер-Админ — всех учеников тенанта.
@@ -171,7 +171,7 @@ export class StudentsService {
         `Новый баланс: ${updated.balance}`,
         `Принял(а): ${collector?.fullName ?? "—"}`,
       ].join("\n");
-      await this.telegram.sendMessage(settings.telegramBotToken, student.parentTelegramChatId, text);
+      await this.telegramBot.sendToParent(tenantId, settings.telegramBotToken, student.parentTelegramChatId, text);
     }
 
     return (await this.withPaidStatus(tenantId, [updated]))[0];
@@ -185,17 +185,36 @@ export class StudentsService {
     });
   }
 
-  // Помечает каждого ученика признаком оплаты за текущий расчётный месяц.
-  private async withPaidStatus<T extends { id: string }>(tenantId: string, students: T[]) {
-    if (students.length === 0) return [] as (T & { isPaidCurrentMonth: boolean })[];
+  // Помечает каждого ученика признаком оплаты за текущий расчётный месяц и состоянием
+  // согласия родителя на обработку данных (null — Telegram родителя не привязан).
+  private async withPaidStatus<T extends { id: string; parentTelegramChatId: string | null }>(
+    tenantId: string,
+    students: T[],
+  ) {
+    type Result = T & { isPaidCurrentMonth: boolean; parentConsentStatus: ConsentStatus | null };
+    if (students.length === 0) return [] as Result[];
 
     const periodMonth = getCurrentPeriodMonth();
-    const payments = await this.prisma.payment.findMany({
-      where: { tenantId, periodMonth, studentId: { in: students.map((s) => s.id) } },
-      select: { studentId: true },
-    });
+    const [payments, consent] = await Promise.all([
+      this.prisma.payment.findMany({
+        where: { tenantId, periodMonth, studentId: { in: students.map((s) => s.id) } },
+        select: { studentId: true },
+      }),
+      this.telegramBot.getConsentStatuses(
+        tenantId,
+        students.map((s) => s.parentTelegramChatId).filter((id): id is string => !!id),
+      ),
+    ]);
     const paidIds = new Set(payments.map((p) => p.studentId));
 
-    return students.map((student) => ({ ...student, isPaidCurrentMonth: paidIds.has(student.id) }));
+    return students.map(
+      (student): Result => ({
+        ...student,
+        isPaidCurrentMonth: paidIds.has(student.id),
+        parentConsentStatus: student.parentTelegramChatId
+          ? (consent.get(student.parentTelegramChatId) ?? "PENDING")
+          : null,
+      }),
+    );
   }
 }

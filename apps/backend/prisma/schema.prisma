@@ -50,6 +50,7 @@ model Tenant {
   rooms             Room[]
   individualLessonLogs IndividualLessonLog[]
   balanceTransactions  BalanceTransaction[]
+  telegramChats        TelegramChat[]
 }
 
 // Физический зал/класс школы. allowDoubleBooking управляет строгостью проверки пересечений:
@@ -352,4 +353,26 @@ model BalanceTransaction {
 
   @@index([tenantId])
   @@index([studentId])
+}
+
+// Чаты, написавшие боту центра. Для родителей здесь же хранится согласие на обработку
+// персональных данных (политика конфиденциальности показывается боту при /start и принимается
+// кнопкой): без активного согласия (consentAcceptedAt задано и consentRevokedAt пусто) бот
+// родителю уведомления не отправляет. consentVersion — версия текста политики, которую принял человек.
+model TelegramChat {
+  id                String    @id @default(uuid())
+  tenantId          String
+  tenant            Tenant    @relation(fields: [tenantId], references: [id])
+  chatId            String
+  firstName         String?
+  lastName          String?
+  username          String?
+  lastMessageAt     DateTime  @default(now())
+  consentVersion    String?
+  consentAcceptedAt DateTime?
+  consentRevokedAt  DateTime?
+  createdAt         DateTime  @default(now())
+
+  @@unique([tenantId, chatId])
+  @@index([tenantId])
 }

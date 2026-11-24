@@ -15,3 +15,9 @@ export async function getTelegramChats(): Promise<TelegramChatOptionDto[]> {
   const { data } = await apiClient.get<TelegramChatOptionDto[]>("/tenant-settings/telegram-chats");
   return data;
 }
+
+// Бот присылает родителю политику конфиденциальности с кнопкой «Согласен».
+export async function requestParentConsent(chatId: string): Promise<{ sent: boolean }> {
+  const { data } = await apiClient.post<{ sent: boolean }>("/telegram/consent-request", { chatId });
+  return data;
+}

@@ -1,9 +1,16 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { ConsentStatus } from "@oplata/shared";
 import { getTelegramChats, getTenantSettings } from "../api/tenantSettings";
 
-// Помогает найти numeric chat_id родителя без ручного копания в Telegram API:
-// показывает тех, кто недавно написал что-то боту центра, и даёт выбрать одним кликом.
+const CONSENT_LABEL: Record<ConsentStatus, { text: string; className: string }> = {
+  ACCEPTED: { text: "согласие получено", className: "text-emerald-600" },
+  PENDING: { text: "ещё не подтвердил согласие", className: "text-amber-600" },
+  REVOKED: { text: "согласие отозвано", className: "text-red-600" },
+};
+
+// Помогает привязать родителя без ручного поиска chat_id: показывает всех, кто написал боту центра
+// (/start), и даёт выбрать одним кликом. Рядом видно, принял ли человек политику конфиденциальности.
 export default function TelegramChatPicker({ onSelect }: { onSelect: (chatId: string) => void }) {
   const [open, setOpen] = useState(false);
   const { data: settings } = useQuery({ queryKey: ["tenant-settings"], queryFn: getTenantSettings });
@@ -30,15 +37,11 @@ export default function TelegramChatPicker({ onSelect }: { onSelect: (chatId: st
       </button>
       {open && (
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm">
-          {isFetching && <p className="text-slate-500">Ищем сообщения боту…</p>}
-          {isError && (
-            <p className="text-red-600">
-              Не удалось получить чаты. Проверьте токен бота в Настройках.
-            </p>
-          )}
+          {isFetching && <p className="text-slate-500">Загружаем список…</p>}
+          {isError && <p className="text-red-600">Не удалось получить список. Попробуйте ещё раз.</p>}
           {!isFetching && !isError && chats?.length === 0 && (
             <p className="text-slate-500">
-              Пока никто не писал боту. Попросите родителя отправить боту любое сообщение и нажмите ещё раз.
+              Пока никто не писал боту. Попросите родителя найти бота и отправить ему /start, затем нажмите ещё раз.
             </p>
           )}
           {!isFetching && chats && chats.length > 0 && (
@@ -57,7 +60,9 @@ export default function TelegramChatPicker({ onSelect }: { onSelect: (chatId: st
                       {chat.name}
                       {chat.username ? ` (@${chat.username})` : ""}
                     </span>
-                    {chat.lastMessage && <span className="truncate text-xs text-slate-500">«{chat.lastMessage}»</span>}
+                    <span className={`text-xs ${CONSENT_LABEL[chat.consentStatus].className}`}>
+                      {CONSENT_LABEL[chat.consentStatus].text}
+                    </span>
                   </button>
                 </li>
               ))}

@@ -5,7 +5,7 @@ import { PaymentMethod, Role, StudentStatus } from "@oplata/shared";
 import { depositBalance, getStudent, updateStudent, updateStudentStatus } from "../../api/students";
 import { createPayment } from "../../api/payments";
 import { getIndividualLessonsForStudent } from "../../api/individualLessons";
-import { getTenantSettings } from "../../api/tenantSettings";
+import { getTenantSettings, requestParentConsent } from "../../api/tenantSettings";
 import { useAuthStore } from "../../store/auth.store";
 import TelegramChatPicker from "../../components/TelegramChatPicker";
 
@@ -68,6 +68,12 @@ export default function StudentDetailPage() {
       invalidateStudent();
       setDepositAmount("");
     },
+  });
+
+  // Запрос согласия на обработку данных: бот пишет родителю политику и кнопку «Согласен».
+  const consentMutation = useMutation({
+    mutationFn: () => requestParentConsent(student!.parentTelegramChatId!),
+    onSuccess: invalidateStudent,
   });
 
   // Статус приостановки (только Супер-Админ)
@@ -270,6 +276,44 @@ export default function StudentDetailPage() {
                 {student.parentTelegramChatId ? "подключён" : "—"}
               </dd>
             </div>
+            {student.parentConsentStatus && (
+              <div className="flex items-start justify-between gap-4">
+                <dt className="text-slate-500">Согласие на обработку данных</dt>
+                <dd className="text-right">
+                  {student.parentConsentStatus === "ACCEPTED" && (
+                    <span className="text-emerald-600">получено — уведомления включены</span>
+                  )}
+                  {student.parentConsentStatus !== "ACCEPTED" && (
+                    <div className="space-y-1">
+                      <p className={student.parentConsentStatus === "REVOKED" ? "text-red-600" : "text-amber-600"}>
+                        {student.parentConsentStatus === "REVOKED"
+                          ? "отозвано — уведомления не отправляются"
+                          : "не подтверждено — уведомления не отправляются"}
+                      </p>
+                      {isAdmin && (
+                        <button
+                          onClick={() => consentMutation.mutate()}
+                          disabled={consentMutation.isPending}
+                          className="text-xs font-medium text-[var(--brand-primary)] disabled:opacity-60"
+                        >
+                          {consentMutation.isPending ? "Отправляем…" : "Отправить родителю запрос согласия"}
+                        </button>
+                      )}
+                      {consentMutation.isSuccess && (
+                        <p className="text-xs text-emerald-600">
+                          {consentMutation.data.sent ? "Запрос отправлен в Telegram." : "Бот не настроен."}
+                        </p>
+                      )}
+                      {consentMutation.isError && (
+                        <p className="text-xs text-red-600">
+                          Не удалось отправить. Родитель должен сначала написать боту /start.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </dd>
+              </div>
+            )}
           </dl>
         )}
 

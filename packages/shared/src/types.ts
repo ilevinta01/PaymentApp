@@ -35,11 +35,16 @@ export interface TenantSettingsDto {
   individualLessonColor: string;
 }
 
+// ACCEPTED — родитель принял политику конфиденциальности, PENDING — ещё не принял,
+// REVOKED — отозвал согласие (уведомления ему не отправляются).
+export type ConsentStatus = "ACCEPTED" | "PENDING" | "REVOKED";
+
 export interface TelegramChatOptionDto {
   chatId: string;
   name: string;
   username: string | null;
-  lastMessage: string | null;
+  consentStatus: ConsentStatus;
+  consentAcceptedAt: string | null;
 }
 
 export interface RoomDto {
@@ -103,6 +108,8 @@ export interface StudentDto {
   parentPhone: string | null;
   parentTelegramChatId: string | null;
   isPaidCurrentMonth?: boolean;
+  // null — Telegram родителя не привязан.
+  parentConsentStatus?: ConsentStatus | null;
   balance: string;
   group?: {
     id: string;

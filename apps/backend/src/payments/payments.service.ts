@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { JwtPayload, PaymentMethod, Role } from "@oplata/shared";
 import { getCurrentPeriodMonth } from "../common/period";
 import { PrismaService } from "../prisma/prisma.service";
-import { TelegramService } from "../telegram/telegram.service";
+import { TelegramBotService } from "../telegram/telegram-bot.service";
 import { CreatePaymentDto } from "./dto/create-payment.dto";
 import { UpdatePaymentDto } from "./dto/update-payment.dto";
 
@@ -19,7 +19,7 @@ const METHOD_LABEL: Record<PaymentMethod, string> = {
 export class PaymentsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly telegram: TelegramService,
+    private readonly telegramBot: TelegramBotService,
   ) {}
 
   findAll(tenantId: string, periodMonth?: string) {
@@ -109,7 +109,7 @@ export class PaymentsService {
         `Способ: ${methodLabel}`,
         `Месяц: ${periodMonth}`,
       ].join("\n");
-      await this.telegram.sendMessage(settings.telegramBotToken, student.parentTelegramChatId, text);
+      await this.telegramBot.sendToParent(tenantId, settings.telegramBotToken, student.parentTelegramChatId, text);
     }
 
     return payment;

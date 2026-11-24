@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import { JwtPayload, PaymentMethod, Role } from "@oplata/shared";
 import { PrismaService } from "../prisma/prisma.service";
+import { TelegramBotService } from "../telegram/telegram-bot.service";
 import { TelegramService } from "../telegram/telegram.service";
 import { CreateIndividualLessonDto } from "./dto/create-individual-lesson.dto";
 import { MarkParticipantPaidDto } from "./dto/mark-participant-paid.dto";
@@ -93,6 +94,7 @@ export class IndividualLessonsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly telegram: TelegramService,
+    private readonly telegramBot: TelegramBotService,
   ) {}
 
   async findAll(tenantId: string, user: JwtPayload) {
@@ -418,7 +420,12 @@ export class IndividualLessonsService {
         `Способ: ${methodLabel}`,
         `Оплату принял(а): ${collector?.fullName ?? "—"}`,
       ].join("\n");
-      await this.telegram.sendMessage(settings.telegramBotToken, participant.student.parentTelegramChatId, text);
+      await this.telegramBot.sendToParent(
+        tenantId,
+        settings.telegramBotToken,
+        participant.student.parentTelegramChatId,
+        text,
+      );
     }
 
     return updated;
@@ -603,7 +610,7 @@ export class IndividualLessonsService {
         `Ваша часть оплаты: ${participant.shareAmount}`,
         ...(conflict ? [`⚠ Внимание: это время пересекается с занятием группы «${conflict.groupName}»`] : []),
       ].join("\n");
-      await this.telegram.sendMessage(settings.telegramBotToken, student.parentTelegramChatId, text);
+      await this.telegramBot.sendToParent(tenantId, settings.telegramBotToken, student.parentTelegramChatId, text);
     }
   }
 
@@ -666,7 +673,7 @@ export class IndividualLessonsService {
         `Преподаватель: ${lesson.teacher.fullName}`,
         `Дата и время: ${when}`,
       ].join("\n");
-      await this.telegram.sendMessage(settings.telegramBotToken, student.parentTelegramChatId, text);
+      await this.telegramBot.sendToParent(tenantId, settings.telegramBotToken, student.parentTelegramChatId, text);
     }
   }
 }
