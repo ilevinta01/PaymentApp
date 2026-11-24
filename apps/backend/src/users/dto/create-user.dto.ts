@@ -1,13 +1,9 @@
-import { IsArray, IsEmail, IsEnum, IsOptional, IsString, MinLength } from "class-validator";
+import { IsArray, IsEmail, IsEnum, IsOptional, IsString } from "class-validator";
 import { Role } from "@oplata/shared";
 
 export class CreateUserDto {
   @IsEmail()
   email!: string;
-
-  @IsString()
-  @MinLength(6)
-  password!: string;
 
   @IsString()
   fullName!: string;

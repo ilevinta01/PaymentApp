@@ -207,6 +207,10 @@ export interface UserDto {
   phone: string | null;
   role: Role;
   isActive: boolean;
+  // false — человек ещё не перешёл по ссылке из письма и не задал пароль.
+  emailVerified?: boolean;
+  // true — аккаунт заблокирован после 3 неверных паролей, нужно восстановление через email.
+  isLocked?: boolean;
   groupIds?: string[];
   individualLessonRate?: string | null;
   telegramChatId?: string | null;
@@ -249,7 +253,13 @@ export interface TenantSummaryDto {
   isDebtorsReportEnabled: boolean;
   isIndividualDebtorsReportEnabled: boolean;
   isChangeLogEnabled: boolean;
-  owner: { fullName: string; email: string; phone: string | null } | null;
+  owner: {
+    fullName: string;
+    email: string;
+    phone: string | null;
+    emailVerified?: boolean;
+    isLocked?: boolean;
+  } | null;
 }
 
 export interface TeacherEarningsDto {

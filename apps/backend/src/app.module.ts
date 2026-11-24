@@ -4,6 +4,7 @@ import { ConfigModule } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
 import { PrismaModule } from "./prisma/prisma.module";
 import { AuthModule } from "./auth/auth.module";
+import { MailModule } from "./mail/mail.module";
 import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard";
 import { SubscriptionGuard } from "./auth/guards/subscription.guard";
 import { RolesGuard } from "./auth/guards/roles.guard";
@@ -27,6 +28,7 @@ import { HealthModule } from "./health/health.module";
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
     PrismaModule,
+    MailModule,
     AuthModule,
     TenantSettingsModule,
     UsersModule,

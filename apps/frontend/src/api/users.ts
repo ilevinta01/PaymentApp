@@ -8,15 +8,20 @@ export async function getStaff(): Promise<UserDto[]> {
 
 export interface StaffPayload {
   email: string;
-  password: string;
   fullName: string;
   phone?: string;
   role: Role;
   groupIds?: string[];
 }
 
+// inviteSent — ушло ли сотруднику письмо со ссылкой (по ней он подтверждает email и сам задаёт пароль).
 export async function createStaff(payload: StaffPayload) {
-  const { data } = await apiClient.post<UserDto>("/users", payload);
+  const { data } = await apiClient.post<UserDto & { inviteSent: boolean }>("/users", payload);
+  return data;
+}
+
+export async function sendStaffAccessLink(id: string): Promise<{ sent: boolean }> {
+  const { data } = await apiClient.post<{ sent: boolean }>(`/users/${id}/send-access-link`);
   return data;
 }
 

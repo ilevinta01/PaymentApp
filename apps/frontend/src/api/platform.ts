@@ -9,11 +9,15 @@ export async function getTenants(): Promise<TenantSummaryDto[]> {
 export async function createTenant(payload: {
   name: string;
   superAdminEmail: string;
-  superAdminPassword: string;
   superAdminFullName: string;
   superAdminPhone?: string;
 }) {
   const { data } = await platformClient.post("/platform/tenants", payload);
+  return data;
+}
+
+export async function resendOwnerInvite(tenantId: string): Promise<{ sent: boolean }> {
+  const { data } = await platformClient.post<{ sent: boolean }>(`/platform/tenants/${tenantId}/resend-owner-invite`);
   return data;
 }
 

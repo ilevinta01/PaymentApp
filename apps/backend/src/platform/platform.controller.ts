@@ -46,6 +46,11 @@ export class PlatformController {
     return this.service.createTenant(dto);
   }
 
+  @Post(":id/resend-owner-invite")
+  resendOwnerInvite(@Param("id") id: string) {
+    return this.service.resendOwnerInvite(id);
+  }
+
   @Patch(":id/subscription")
   updateSubscription(@Param("id") id: string, @Body() dto: UpdateSubscriptionDto) {
     return this.service.updateSubscription(id, dto);

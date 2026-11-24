@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
-import * as bcrypt from "bcrypt";
 import { PrismaService } from "../prisma/prisma.service";
+import { AuthService } from "../auth/auth.service";
+import { unusablePasswordHash } from "../auth/unusable-password";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 
@@ -11,6 +12,8 @@ const SAFE_SELECT = {
   phone: true,
   role: true,
   isActive: true,
+  emailVerifiedAt: true,
+  lockedAt: true,
   individualLessonRate: true,
   telegramChatId: true,
   groupsTaught: { select: { id: true } },
@@ -23,19 +26,24 @@ type RawUser = {
   phone: string | null;
   role: string;
   isActive: boolean;
+  emailVerifiedAt: Date | null;
+  lockedAt: Date | null;
   individualLessonRate: unknown;
   telegramChatId: string | null;
   groupsTaught: { id: string }[];
 };
 
 function mapUser(user: RawUser) {
-  const { groupsTaught, ...rest } = user;
-  return { ...rest, groupIds: groupsTaught.map((g) => g.id) };
+  const { groupsTaught, emailVerifiedAt, lockedAt, ...rest } = user;
+  return { ...rest, emailVerified: !!emailVerifiedAt, isLocked: !!lockedAt, groupIds: groupsTaught.map((g) => g.id) };
 }
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auth: AuthService,
+  ) {}
 
   async findAll(tenantId: string) {
     const users = await this.prisma.user.findMany({
@@ -54,7 +62,8 @@ export class UsersService {
       await this.assertGroupsBelongToTenant(tenantId, dto.groupIds);
     }
 
-    const passwordHash = await bcrypt.hash(dto.password, 10);
+    // Пароль сотруднику задаёт не владелец, а сам сотрудник — по ссылке из письма (это же подтверждает email).
+    const passwordHash = await unusablePasswordHash();
     const user = await this.prisma.user.create({
       data: {
         tenantId,
@@ -68,7 +77,16 @@ export class UsersService {
       select: SAFE_SELECT,
     });
 
-    return mapUser(user);
+    const inviteSent = await this.auth.sendAccessLink(user.id, true);
+    return { ...mapUser(user), inviteSent };
+  }
+
+  /** Повторно отправить сотруднику письмо: приглашение, если email не подтверждён, иначе ссылку для нового пароля. */
+  async resendAccessLink(tenantId: string, userId: string) {
+    const user = await this.prisma.user.findFirst({ where: { id: userId, tenantId } });
+    if (!user) throw new NotFoundException("Сотрудник не найден");
+    if (!user.isActive) throw new BadRequestException("Сотрудник деактивирован");
+    return { sent: await this.auth.sendAccessLink(userId, true) };
   }
 
   async update(tenantId: string, userId: string, dto: UpdateUserDto) {

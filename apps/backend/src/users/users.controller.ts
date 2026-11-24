@@ -21,6 +21,11 @@ export class UsersController {
     return this.service.create(user.tenantId, dto);
   }
 
+  @Post(":id/send-access-link")
+  sendAccessLink(@CurrentUser() user: JwtPayload, @Param("id") id: string) {
+    return this.service.resendAccessLink(user.tenantId, id);
+  }
+
   @Patch(":id")
   update(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Body() dto: UpdateUserDto) {
     return this.service.update(user.tenantId, id, dto);

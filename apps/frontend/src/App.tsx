@@ -2,6 +2,9 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { Role } from "@oplata/shared";
 import OfflineBanner from "./components/OfflineBanner";
 import LoginPage from "./pages/LoginPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import SetPasswordPage from "./pages/SetPasswordPage";
+import ChangePasswordPage from "./pages/shared/ChangePasswordPage";
 import RequireRole from "./components/RequireRole";
 import AdminLayout from "./layouts/AdminLayout";
 import TeacherLayout from "./layouts/TeacherLayout";
@@ -33,6 +36,8 @@ export default function App() {
       <OfflineBanner />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/set-password" element={<SetPasswordPage />} />
         <Route path="/platform" element={<PlatformPage />} />
 
         <Route element={<RequireRole allow={[Role.SUPER_ADMIN]} />}>
@@ -56,6 +61,7 @@ export default function App() {
             <Route path="reports/cash-collections" element={<CashCollectionsPage />} />
             <Route path="staff" element={<StaffPage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="password" element={<ChangePasswordPage />} />
           </Route>
         </Route>
 
@@ -69,10 +75,11 @@ export default function App() {
             <Route path="individual-lessons" element={<IndividualLessonsPage />} />
             <Route path="schedule" element={<SchedulePage />} />
             <Route path="payment" element={<PaymentQuickPage />} />
+            <Route path="password" element={<ChangePasswordPage />} />
           </Route>
         </Route>
 
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/"element={<Navigate to="/login" replace />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </>

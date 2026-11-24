@@ -120,6 +120,17 @@ model User {
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
 
+  // Подтверждение email: null — человек ещё не перешёл по ссылке из письма и не задал пароль,
+  // войти в такой аккаунт нельзя.
+  emailVerifiedAt     DateTime?
+  // Защита от подбора пароля: после 3 неверных попыток аккаунт блокируется (lockedAt),
+  // снять блокировку можно только восстановлением пароля через email.
+  failedLoginAttempts Int       @default(0)
+  lockedAt            DateTime?
+  // Выданные до этого момента токены входа недействительны (смена/восстановление пароля).
+  passwordChangedAt   DateTime?
+  authTokens          AuthToken[]
+
   // Ставка за час индивидуального занятия — задаётся Супер-Админом персонально
   // для каждого преподавателя, у разных преподавателей ставка может отличаться.
   individualLessonRate Decimal? @db.Decimal(10, 2)
@@ -400,4 +411,19 @@ model DataErasureLog {
   createdAt    DateTime @default(now())
 
   @@index([tenantId])
+}
+
+// Одноразовые ссылки из писем: приглашение (подтверждение email + первый пароль) и восстановление пароля.
+// В базе хранится только хэш токена — по утечке базы войти по ссылке нельзя.
+model AuthToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // INVITE | RESET
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, type])
 }

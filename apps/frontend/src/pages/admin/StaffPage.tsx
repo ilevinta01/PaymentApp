@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { GroupDto, Role, UserDto } from "@oplata/shared";
-import { createStaff, getStaff, setStaffActive, updateStaff } from "../../api/users";
+import { createStaff, getStaff, sendStaffAccessLink, setStaffActive, updateStaff } from "../../api/users";
 import { getGroups } from "../../api/groups";
 import { getTenantSettings } from "../../api/tenantSettings";
 import TelegramChatPicker from "../../components/TelegramChatPicker";
@@ -82,6 +82,12 @@ function StaffRow({
     onSuccess: onChanged,
   });
 
+  const accessLinkMutation = useMutation({
+    mutationFn: () => sendStaffAccessLink(member.id),
+    onSuccess: onChanged,
+  });
+  const needsLink = !member.emailVerified || member.isLocked;
+
   const assignedNames = groups.filter((g) => (member.groupIds ?? []).includes(g.id)).map((g) => g.name);
 
   return (
@@ -91,6 +97,30 @@ function StaffRow({
           <p className="font-medium text-slate-800">{member.fullName}</p>
           <p className="text-sm text-slate-500">{member.email}</p>
           {member.phone && <p className="text-sm text-slate-500">{member.phone}</p>}
+          {member.emailVerified === false && (
+            <p className="text-xs text-amber-600">Ожидает подтверждения email — вход пока невозможен</p>
+          )}
+          {member.isLocked && (
+            <p className="text-xs text-red-600">Заблокирован после 3 неверных паролей — нужно восстановление</p>
+          )}
+          {needsLink && member.isActive && (
+            <div>
+              <button
+                onClick={() => accessLinkMutation.mutate()}
+                disabled={accessLinkMutation.isPending}
+                className="text-xs font-medium text-[var(--brand-primary)] disabled:opacity-60"
+              >
+                {member.emailVerified === false ? "Отправить приглашение ещё раз" : "Отправить ссылку для нового пароля"}
+              </button>
+              {accessLinkMutation.isSuccess && (
+                <p className={`text-xs ${accessLinkMutation.data.sent ? "text-emerald-600" : "text-red-600"}`}>
+                  {accessLinkMutation.data.sent
+                    ? "Письмо отправлено."
+                    : "Письмо не отправилось. Проверьте почтовые настройки сервера."}
+                </p>
+              )}
+            </div>
+          )}
         </div>
         <div className="flex flex-col items-end gap-1">
           <span className="text-sm text-slate-500">
@@ -194,7 +224,6 @@ export default function StaffPage() {
   const { data: settings } = useQuery({ queryKey: ["tenant-settings"], queryFn: getTenantSettings });
 
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState<Role>(Role.TEACHER);
@@ -204,11 +233,10 @@ export default function StaffPage() {
 
   const mutation = useMutation({
     mutationFn: () =>
-      createStaff({ email, password, fullName, phone: phone || undefined, role, groupIds }),
+      createStaff({ email, fullName, phone: phone || undefined, role, groupIds }),
     onSuccess: () => {
       invalidateStaff();
       setEmail("");
-      setPassword("");
       setFullName("");
       setPhone("");
       setRole(Role.TEACHER);
@@ -250,15 +278,6 @@ export default function StaffPage() {
             onChange={(e) => setPhone(e.target.value)}
             className="min-w-[160px] flex-1 rounded-lg border border-slate-300 px-3 py-2"
           />
-          <input
-            placeholder="Пароль"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={6}
-            className="w-40 rounded-lg border border-slate-300 px-3 py-2"
-          />
           <select
             value={role}
             onChange={(e) => setRole(e.target.value as Role)}
@@ -280,6 +299,21 @@ export default function StaffPage() {
         >
           {mutation.isPending ? "Сохраняем…" : "Добавить сотрудника"}
         </button>
+        <p className="text-xs text-slate-500">
+          Пароль сотрудник задаёт сам: ему придёт письмо со ссылкой, по которой он подтверждает email и придумывает
+          пароль.
+        </p>
+        {mutation.isSuccess && mutation.data.inviteSent && (
+          <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">
+            Сотрудник добавлен. Приглашение отправлено на {mutation.data.email}.
+          </p>
+        )}
+        {mutation.isSuccess && !mutation.data.inviteSent && (
+          <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-700">
+            Сотрудник добавлен, но письмо не отправилось (проверьте почтовые настройки сервера). Отправьте
+            приглашение ещё раз из списка ниже.
+          </p>
+        )}
         {mutation.isError && <p className="text-sm text-red-600">Не удалось добавить сотрудника.</p>}
       </form>
 

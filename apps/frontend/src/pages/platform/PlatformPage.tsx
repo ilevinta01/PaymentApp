@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FEATURE_DEFINITIONS, SubscriptionStatus, TenantSummaryDto } from "@oplata/shared";
 import {
   createTenant,
+  resendOwnerInvite,
   downloadContract,
   getFeaturePrices,
   getTenants,
@@ -116,6 +117,8 @@ function TenantDetailView({
     onSuccess: onChanged,
   });
 
+  const inviteMutation = useMutation({ mutationFn: () => resendOwnerInvite(tenant.id) });
+
   const isBlocked = tenant.subscriptionStatus === SubscriptionStatus.BLOCKED;
 
   return (
@@ -141,6 +144,24 @@ function TenantDetailView({
             {tenant.owner.email}
             {tenant.owner.phone ? ` · ${tenant.owner.phone}` : ""}
           </p>
+          {tenant.owner.emailVerified === false && <p className="text-amber-600">Email не подтверждён — владелец ещё не задал пароль.</p>}
+          {tenant.owner.isLocked && <p className="text-red-600">Аккаунт заблокирован после 3 неверных паролей.</p>}
+          {(tenant.owner.emailVerified === false || tenant.owner.isLocked) && (
+            <div className="mt-1">
+              <button
+                onClick={() => inviteMutation.mutate()}
+                disabled={inviteMutation.isPending}
+                className="font-medium text-indigo-600 disabled:opacity-60"
+              >
+                {tenant.owner.emailVerified === false ? "Отправить приглашение ещё раз" : "Отправить ссылку для нового пароля"}
+              </button>
+              {inviteMutation.isSuccess && (
+                <p className={inviteMutation.data.sent ? "text-emerald-600" : "text-red-600"}>
+                  {inviteMutation.data.sent ? "Письмо отправлено." : "Письмо не отправилось — проверьте почтовые настройки сервера."}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -276,7 +297,6 @@ function TenantListRow({ tenant, onClick }: { tenant: TenantSummaryDto; onClick:
 function CreateTenantForm({ onCreated }: { onCreated: () => void }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
 
@@ -285,7 +305,6 @@ function CreateTenantForm({ onCreated }: { onCreated: () => void }) {
       createTenant({
         name,
         superAdminEmail: email,
-        superAdminPassword: password,
         superAdminFullName: fullName,
         superAdminPhone: phone || undefined,
       }),
@@ -293,7 +312,6 @@ function CreateTenantForm({ onCreated }: { onCreated: () => void }) {
       onCreated();
       setName("");
       setEmail("");
-      setPassword("");
       setFullName("");
       setPhone("");
     },
@@ -335,21 +353,26 @@ function CreateTenantForm({ onCreated }: { onCreated: () => void }) {
         onChange={(e) => setPhone(e.target.value)}
         className="min-w-[160px] flex-1 rounded-lg border border-slate-300 px-3 py-2"
       />
-      <input
-        placeholder="Пароль"
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        required
-        minLength={6}
-        className="w-40 rounded-lg border border-slate-300 px-3 py-2"
-      />
       <button
         disabled={mutation.isPending}
         className="rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white disabled:opacity-60"
       >
         {mutation.isPending ? "Создаём…" : "Подключить центр"}
       </button>
+      <p className="w-full text-xs text-slate-500">
+        Пароль владелец задаёт сам: на его email придёт письмо со ссылкой для подтверждения почты.
+      </p>
+      {mutation.isSuccess && mutation.data.inviteSent && (
+        <p className="w-full rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">
+          Центр подключён. Приглашение отправлено владельцу.
+        </p>
+      )}
+      {mutation.isSuccess && !mutation.data.inviteSent && (
+        <p className="w-full rounded-lg bg-amber-50 p-3 text-sm text-amber-700">
+          Центр подключён, но письмо не отправилось (проверьте почтовые настройки сервера). Отправьте приглашение
+          ещё раз из карточки центра.
+        </p>
+      )}
       {mutation.isError && (
         <p className="w-full text-sm text-red-600">Не удалось создать центр. Проверьте данные.</p>
       )}

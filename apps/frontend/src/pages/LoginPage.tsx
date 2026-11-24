@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { Role } from "@oplata/shared";
-import { login } from "../api/auth";
+import { errorCode, errorMessage, login } from "../api/auth";
 import { useAuthStore } from "../store/auth.store";
 
 export default function LoginPage() {
@@ -18,6 +18,9 @@ export default function LoginPage() {
       navigate(data.user.role === Role.SUPER_ADMIN ? "/admin" : "/teacher");
     },
   });
+
+  const code = errorCode(mutation.error);
+  const needsRecovery = code === "ACCOUNT_LOCKED" || code === "EMAIL_NOT_VERIFIED";
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
@@ -53,7 +56,19 @@ export default function LoginPage() {
           />
         </div>
         {mutation.isError && (
-          <p className="text-sm text-red-600">Неверный email/пароль, либо подписка центра не оплачена.</p>
+          <div className="space-y-1">
+            <p className="text-sm text-red-600">
+              {errorMessage(mutation.error, "Не удалось войти. Проверьте email и пароль.")}
+            </p>
+            {needsRecovery && (
+              <Link
+                to={`/forgot-password?email=${encodeURIComponent(email)}`}
+                className="text-sm font-medium text-indigo-600"
+              >
+                Восстановить пароль по email →
+              </Link>
+            )}
+          </div>
         )}
         <button
           type="submit"
@@ -62,6 +77,11 @@ export default function LoginPage() {
         >
           {mutation.isPending ? "Входим…" : "Войти"}
         </button>
+        <div className="text-center">
+          <Link to="/forgot-password" className="text-sm text-slate-500 hover:text-indigo-600">
+            Забыли пароль?
+          </Link>
+        </div>
       </form>
     </div>
   );

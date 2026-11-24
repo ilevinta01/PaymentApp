@@ -1,7 +1,8 @@
-import { BadRequestException, ConflictException, Injectable } from "@nestjs/common";
-import * as bcrypt from "bcrypt";
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { FEATURE_DEFINITIONS, Role, SubscriptionStatus } from "@oplata/shared";
 import { PrismaService } from "../prisma/prisma.service";
+import { AuthService } from "../auth/auth.service";
+import { unusablePasswordHash } from "../auth/unusable-password";
 import { CreateTenantDto } from "./dto/create-tenant.dto";
 import { UpdateFeaturesDto } from "./dto/update-features.dto";
 import { UpdateSubscriptionDto } from "./dto/update-subscription.dto";
@@ -17,7 +18,10 @@ function getEffectiveStatus(tenant: { subscriptionStatus: string; subscriptionPa
 
 @Injectable()
 export class PlatformService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auth: AuthService,
+  ) {}
 
   async listTenants() {
     const tenants = await this.prisma.tenant.findMany({
@@ -43,7 +47,7 @@ export class PlatformService {
           where: { role: Role.SUPER_ADMIN },
           orderBy: { createdAt: "asc" },
           take: 1,
-          select: { fullName: true, email: true, phone: true },
+          select: { id: true, fullName: true, email: true, phone: true, emailVerifiedAt: true, lockedAt: true },
         },
       },
       orderBy: { createdAt: "desc" },
@@ -72,7 +76,15 @@ export class PlatformService {
       isDebtorsReportEnabled: tenant.settings?.isDebtorsReportEnabled ?? false,
       isIndividualDebtorsReportEnabled: tenant.settings?.isIndividualDebtorsReportEnabled ?? false,
       isChangeLogEnabled: tenant.settings?.isChangeLogEnabled ?? false,
-      owner: tenant.users[0] ?? null,
+      owner: tenant.users[0]
+        ? {
+            fullName: tenant.users[0].fullName,
+            email: tenant.users[0].email,
+            phone: tenant.users[0].phone,
+            emailVerified: !!tenant.users[0].emailVerifiedAt,
+            isLocked: !!tenant.users[0].lockedAt,
+          }
+        : null,
     }));
   }
 
@@ -84,12 +96,12 @@ export class PlatformService {
     const existingUser = await this.prisma.user.findUnique({ where: { email: dto.superAdminEmail } });
     if (existingUser) throw new ConflictException("Пользователь с таким email уже существует");
 
-    const passwordHash = await bcrypt.hash(dto.superAdminPassword, 10);
+    const passwordHash = await unusablePasswordHash();
     const now = new Date();
     // Новому центру сразу открывается доступ до конца текущего календарного месяца.
     const subscriptionPaidUntil = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-    return this.prisma.tenant.create({
+    const tenant = await this.prisma.tenant.create({
       data: {
         name: dto.name,
         subscriptionStatus: SubscriptionStatus.ACTIVE,
@@ -105,8 +117,30 @@ export class PlatformService {
           },
         },
       },
-      select: { id: true, name: true, subscriptionStatus: true, subscriptionPaidUntil: true },
+      select: {
+        id: true,
+        name: true,
+        subscriptionStatus: true,
+        subscriptionPaidUntil: true,
+        users: { select: { id: true } },
+      },
     });
+
+    // Владелец получает письмо: по ссылке он подтверждает email и сам задаёт пароль.
+    const inviteSent = await this.auth.sendAccessLink(tenant.users[0].id, true);
+    const { users: _users, ...rest } = tenant;
+    return { ...rest, inviteSent };
+  }
+
+  /** Повторно отправить владельцу центра письмо (приглашение или восстановление пароля). */
+  async resendOwnerInvite(tenantId: string) {
+    const owner = await this.prisma.user.findFirst({
+      where: { tenantId, role: Role.SUPER_ADMIN },
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+    if (!owner) throw new NotFoundException("Владелец центра не найден");
+    return { sent: await this.auth.sendAccessLink(owner.id, true) };
   }
 
   async updateSubscription(tenantId: string, dto: UpdateSubscriptionDto) {

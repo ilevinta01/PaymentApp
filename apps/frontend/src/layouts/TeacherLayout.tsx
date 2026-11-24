@@ -23,9 +23,14 @@ export default function TeacherLayout() {
             <p className="text-sm text-slate-500">{user?.fullName}</p>
           </div>
         </div>
-        <button onClick={logout} className="text-sm font-medium text-[var(--brand-primary)]">
-          Выйти
-        </button>
+        <div className="flex items-center gap-4">
+          <Link to="/teacher/password" className="text-sm text-slate-500">
+            Пароль
+          </Link>
+          <button onClick={logout} className="text-sm font-medium text-[var(--brand-primary)]">
+            Выйти
+          </button>
+        </div>
       </header>
       <main className="mx-auto max-w-lg p-4">
         <Outlet />
