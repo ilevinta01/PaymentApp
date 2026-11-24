@@ -21,6 +21,9 @@ export class MailService {
         port,
         secure: port === 465,
         auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,
+        // Только для локального компьютера, где антивирус подменяет сертификаты (ошибка
+        // «self-signed certificate in certificate chain»). На боевом сервере не включать.
+        ...(process.env.SMTP_TLS_INSECURE === "true" ? { tls: { rejectUnauthorized: false } } : {}),
       });
     }
   }
