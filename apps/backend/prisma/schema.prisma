@@ -51,6 +51,7 @@ model Tenant {
   individualLessonLogs IndividualLessonLog[]
   balanceTransactions  BalanceTransaction[]
   telegramChats        TelegramChat[]
+  dataErasureLogs      DataErasureLog[]
 }
 
 // Физический зал/класс школы. allowDoubleBooking управляет строгостью проверки пересечений:
@@ -93,6 +94,9 @@ model TenantSettings {
   // Единый цвет всех индивидуальных занятий в расписании (у групп цвет свой у каждой,
   // см. Group.color) — задаётся администратором тенанта в настройках.
   individualLessonColor    String  @default("#f59e0b")
+  // Через сколько лет без оплат и занятий данные ученика обезличиваются автоматически.
+  // null — автоматическое обезличивание выключено.
+  retentionYears           Int?
 }
 
 // Глобальный (не привязанный к тенанту) прайс-лист платных функций — задаётся владельцем
@@ -133,6 +137,7 @@ model User {
   individualLessonLogsActedBy IndividualLessonLog[] @relation("IndividualLessonLogActor")
   balanceTransactionsCreated  BalanceTransaction[]  @relation("BalanceTransactionCreatedBy")
   individualLessonPaymentsCollected IndividualLessonParticipant[] @relation("IndividualLessonParticipantPaidBy")
+  dataErasuresMade                  DataErasureLog[]              @relation("DataErasureLogActor")
 
   @@index([tenantId])
 }
@@ -192,6 +197,10 @@ model Student {
   // Аванс/баланс ученика: пополняется вручную (например, оплата за несколько месяцев вперёд)
   // и автоматически списывается в счёт будущих месяцев группы и/или индивидуальных занятий.
   balance Decimal @default(0) @db.Decimal(10, 2)
+
+  // Заполняется, когда персональные данные ученика и родителя стёрты (см. StudentsService.anonymize):
+  // запись остаётся ради финансовой истории, но к человеку больше не привязана.
+  anonymizedAt DateTime?
 
   payments               Payment[]
   individualLessonShares IndividualLessonParticipant[]
@@ -374,5 +383,21 @@ model TelegramChat {
   createdAt         DateTime  @default(now())
 
   @@unique([tenantId, chatId])
+  @@index([tenantId])
+}
+
+// Журнал обезличивания учеников. Имя НЕ хранится (иначе обезличивание бессмысленно) — только
+// безличная метка. reason: "MANUAL" (нажал админ) | "RETENTION" (истёк срок хранения, actorId пуст).
+model DataErasureLog {
+  id           String   @id @default(uuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  studentId    String
+  studentLabel String
+  reason       String
+  actorId      String?
+  actor        User?    @relation("DataErasureLogActor", fields: [actorId], references: [id])
+  createdAt    DateTime @default(now())
+
   @@index([tenantId])
 }

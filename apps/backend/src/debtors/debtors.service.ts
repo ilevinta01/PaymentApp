@@ -16,7 +16,7 @@ export class DebtorsService {
 
     const [students, paidPayments] = await Promise.all([
       this.prisma.student.findMany({
-        where: { tenantId },
+        where: { tenantId, anonymizedAt: null },
         include: { group: { select: { id: true, name: true, monthlyPrice: true } } },
         orderBy: { fullName: "asc" },
       }),

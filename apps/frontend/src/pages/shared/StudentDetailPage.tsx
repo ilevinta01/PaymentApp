@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PaymentMethod, Role, StudentStatus } from "@oplata/shared";
-import { depositBalance, getStudent, updateStudent, updateStudentStatus } from "../../api/students";
+import { anonymizeStudent, depositBalance, getStudent, updateStudent, updateStudentStatus } from "../../api/students";
 import { createPayment } from "../../api/payments";
 import { getIndividualLessonsForStudent } from "../../api/individualLessons";
 import { getTenantSettings, requestParentConsent } from "../../api/tenantSettings";
@@ -24,6 +24,7 @@ function formatDate(value: string | null | undefined) {
 export default function StudentDetailPage() {
   const { studentId } = useParams<{ studentId: string }>();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const isAdmin = useAuthStore((s) => s.user?.role) === Role.SUPER_ADMIN;
 
   const { data: student, isLoading } = useQuery({
@@ -75,6 +76,24 @@ export default function StudentDetailPage() {
     mutationFn: () => requestParentConsent(student!.parentTelegramChatId!),
     onSuccess: invalidateStudent,
   });
+
+  // Обезличивание: необратимо стирает персональные данные, платежи остаются.
+  const anonymizeMutation = useMutation({
+    mutationFn: () => anonymizeStudent(studentId!),
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      navigate(-1);
+    },
+  });
+  const confirmAnonymize = () => {
+    const ok = window.confirm(
+      `Обезличить ученика «${student?.fullName}»?\n\n` +
+        "Будут безвозвратно стёрты: ФИО, дата рождения, телефоны, данные родителя, Telegram и согласие.\n" +
+        "Платежи и суммы останутся для отчётности, но без имени.\n\n" +
+        "Отменить это действие невозможно.",
+    );
+    if (ok) anonymizeMutation.mutate();
+  };
 
   // Статус приостановки (только Супер-Админ)
   const statusMutation = useMutation({
@@ -139,7 +158,7 @@ export default function StudentDetailPage() {
           >
             {student.isPaidCurrentMonth ? "Оплачено за текущий месяц" : "Не оплачено за текущий месяц"}
           </span>
-          {isAdmin ? (
+          {isAdmin && !student.anonymizedAt ? (
             <select
               value={student.status}
               onChange={(e) => statusMutation.mutate(e.target.value as StudentStatus)}
@@ -159,7 +178,14 @@ export default function StudentDetailPage() {
         </div>
       </div>
 
-      {!student.isPaidCurrentMonth && (
+      {student.anonymizedAt && (
+        <p className="rounded-xl bg-slate-100 p-4 text-sm text-slate-600">
+          Данные ученика обезличены {formatDate(student.anonymizedAt)}. Персональная информация удалена, платежи
+          сохранены без имени.
+        </p>
+      )}
+
+      {!student.isPaidCurrentMonth && !student.anonymizedAt && (
         <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
           <h3 className="font-semibold text-slate-900">Зафиксировать оплату</h3>
           {isAdmin ? (
@@ -206,7 +232,7 @@ export default function StudentDetailPage() {
         </div>
       )}
 
-      {isAdmin && (
+      {isAdmin && !student.anonymizedAt && (
         <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
           <h3 className="font-semibold text-slate-900">Баланс (аванс): {student.balance}</h3>
           <div className="flex flex-wrap gap-2">
@@ -245,7 +271,7 @@ export default function StudentDetailPage() {
       <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-slate-900">Контактные данные</h3>
-          {isAdmin && (
+          {isAdmin && !student.anonymizedAt && (
             <button onClick={() => setEditing((v) => !v)} className="text-sm font-medium text-[var(--brand-primary)]">
               {editing ? "Отмена" : "Изменить"}
             </button>
@@ -398,6 +424,24 @@ export default function StudentDetailPage() {
             ))}
             {individualLessons?.length === 0 && <li className="py-2 text-slate-500">Занятий пока не было</li>}
           </ul>
+        </div>
+      )}
+
+      {isAdmin && !student.anonymizedAt && (
+        <div className="space-y-2 rounded-xl border border-red-200 bg-white p-4">
+          <h3 className="font-semibold text-slate-900">Защита персональных данных</h3>
+          <p className="text-sm text-slate-500">
+            По просьбе родителя или по истечении срока хранения можно стереть персональные данные ученика. Платежи
+            останутся в отчётах без имени. Действие необратимо.
+          </p>
+          <button
+            onClick={confirmAnonymize}
+            disabled={anonymizeMutation.isPending}
+            className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 disabled:opacity-60"
+          >
+            {anonymizeMutation.isPending ? "Обезличиваем…" : "Анонимизировать ученика"}
+          </button>
+          {anonymizeMutation.isError && <p className="text-sm text-red-600">Не удалось обезличить ученика.</p>}
         </div>
       )}
     </div>

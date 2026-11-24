@@ -167,6 +167,16 @@ export default function SettingsPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tenant-settings"] }),
   });
 
+  const [retention, setRetention] = useState("");
+  useEffect(() => {
+    setRetention(data?.retentionYears ? String(data.retentionYears) : "");
+  }, [data?.retentionYears]);
+
+  const retentionMutation = useMutation({
+    mutationFn: () => updateTenantSettings({ retentionYears: retention ? Number(retention) : null }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tenant-settings"] }),
+  });
+
   if (isLoading) return <p className="text-slate-500">Загрузка…</p>;
 
   return (
@@ -246,6 +256,39 @@ export default function SettingsPage() {
       )}
 
       {data?.isScheduleEnabled && <RoomsSection />}
+
+      <div className="space-y-2">
+        <h2 className="text-lg font-semibold text-slate-900">Хранение данных учеников</h2>
+        <p className="text-sm text-slate-500">
+          Закон о защите персональных данных требует не хранить их дольше необходимого. Если выбрать срок, то
+          ночью система сама обезличит учеников, у которых нет долга и не было оплат и занятий за этот срок:
+          имя, телефоны и данные родителей будут стёрты, а платежи останутся в отчётах без имени. Действие
+          необратимо. Каждое обезличивание записывается в журнал изменений.
+        </p>
+        <div className="flex gap-2 rounded-lg border border-slate-200 bg-white p-4">
+          <select
+            value={retention}
+            onChange={(e) => setRetention(e.target.value)}
+            className="flex-1 rounded-lg border border-slate-300 px-3 py-2"
+          >
+            <option value="">Не обезличивать автоматически</option>
+            {[1, 2, 3, 5, 7].map((y) => (
+              <option key={y} value={y}>
+                Через {y} {y === 1 ? "год" : y < 5 ? "года" : "лет"} без активности
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => retentionMutation.mutate()}
+            disabled={retentionMutation.isPending || retention === (data?.retentionYears ? String(data.retentionYears) : "")}
+            className="rounded-lg bg-[var(--brand-primary)] px-4 py-2 font-medium text-white disabled:opacity-60"
+          >
+            Сохранить
+          </button>
+        </div>
+        {retentionMutation.isSuccess && <p className="text-sm text-emerald-600">Сохранено.</p>}
+        {retentionMutation.isError && <p className="text-sm text-red-600">Не удалось сохранить.</p>}
+      </div>
     </div>
   );
 }

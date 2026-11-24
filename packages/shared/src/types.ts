@@ -33,6 +33,7 @@ export interface TenantSettingsDto {
   primaryColor: string | null;
   logoUrl: string | null;
   individualLessonColor: string;
+  retentionYears: number | null;
 }
 
 // ACCEPTED — родитель принял политику конфиденциальности, PENDING — ещё не принял,
@@ -110,6 +111,7 @@ export interface StudentDto {
   isPaidCurrentMonth?: boolean;
   // null — Telegram родителя не привязан.
   parentConsentStatus?: ConsentStatus | null;
+  anonymizedAt?: string | null;
   balance: string;
   group?: {
     id: string;
@@ -182,7 +184,11 @@ export interface IndividualDebtorsByTeacherDto {
   debtors: IndividualDebtorDto[];
 }
 
-export type ChangeLogCategory = "PAYMENT_EDITED" | "INDIVIDUAL_PAID" | "INDIVIDUAL_CANCELLED";
+export type ChangeLogCategory =
+  | "PAYMENT_EDITED"
+  | "INDIVIDUAL_PAID"
+  | "INDIVIDUAL_CANCELLED"
+  | "STUDENT_ANONYMIZED";
 
 export interface ChangeLogEntryDto {
   id: string;

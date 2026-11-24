@@ -29,6 +29,7 @@ export class TenantSettingsService {
         primaryColor: null,
         logoUrl: null,
         individualLessonColor: "#f59e0b",
+        retentionYears: null,
       }
     );
   }

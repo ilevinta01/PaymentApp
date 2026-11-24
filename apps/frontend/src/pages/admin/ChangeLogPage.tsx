@@ -8,12 +8,14 @@ const CATEGORY_LABELS: Record<ChangeLogCategory, string> = {
   PAYMENT_EDITED: "Оплата изменена",
   INDIVIDUAL_PAID: "Оплата индивидуального занятия",
   INDIVIDUAL_CANCELLED: "Отмена индивидуального занятия",
+  STUDENT_ANONYMIZED: "Данные ученика обезличены",
 };
 
 const CATEGORY_COLORS: Record<ChangeLogCategory, string> = {
   PAYMENT_EDITED: "bg-amber-100 text-amber-700",
   INDIVIDUAL_PAID: "bg-emerald-100 text-emerald-700",
   INDIVIDUAL_CANCELLED: "bg-red-100 text-red-700",
+  STUDENT_ANONYMIZED: "bg-slate-200 text-slate-700",
 };
 
 export default function ChangeLogPage() {

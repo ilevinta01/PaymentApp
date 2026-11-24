@@ -34,7 +34,7 @@ export class ReportsService {
         where: { tenantId, kind: "DEPOSIT", createdAt: { gte: start, lt: end } },
         select: { amount: true, paymentMethod: true },
       }),
-      this.prisma.student.count({ where: { tenantId } }),
+      this.prisma.student.count({ where: { tenantId, anonymizedAt: null } }),
       // Понятие "должник" применимо только к текущему месяцу — при просмотре
       // сводки за прошлые месяцы это число всегда отражает текущих должников.
       this.debtorsService.getDebtors(tenantId),
@@ -262,13 +262,18 @@ export class ReportsService {
   }
 
   async getChangeLog(tenantId: string, category?: string, actorId?: string) {
-    const [paymentLogs, lessonLogs] = await Promise.all([
+    const [paymentLogs, lessonLogs, erasureLogs] = await Promise.all([
       this.prisma.paymentLog.findMany({
         where: { tenantId, ...(actorId ? { editedById: actorId } : {}) },
         include: { editedBy: { select: { id: true, fullName: true } }, payment: { include: { student: { select: { fullName: true } } } } },
         orderBy: { editDate: "desc" },
       }),
       this.prisma.individualLessonLog.findMany({
+        where: { tenantId, ...(actorId ? { actorId } : {}) },
+        include: { actor: { select: { id: true, fullName: true } } },
+        orderBy: { createdAt: "desc" },
+      }),
+      this.prisma.dataErasureLog.findMany({
         where: { tenantId, ...(actorId ? { actorId } : {}) },
         include: { actor: { select: { id: true, fullName: true } } },
         orderBy: { createdAt: "desc" },
@@ -296,6 +301,18 @@ export class ReportsService {
           l.action === "CANCELLED"
             ? `Отменено индивидуальное занятие (${l.teacherName}, ${new Date(l.lessonStartAt).toLocaleString("ru-RU")})`
             : `Оплата индивидуального занятия: ${l.amount ?? ""}${l.details ? ` — ${l.details}` : ""}`,
+      })),
+      ...erasureLogs.map((l) => ({
+        id: l.id,
+        category: "STUDENT_ANONYMIZED" as const,
+        date: l.createdAt,
+        actorId: l.actor?.id ?? "",
+        actorName: l.actor?.fullName ?? "Автоматически (истёк срок хранения)",
+        studentName: l.studentLabel,
+        description:
+          l.reason === "RETENTION"
+            ? "Данные ученика и родителя обезличены автоматически по сроку хранения"
+            : "Данные ученика и родителя обезличены по запросу (право на удаление)",
       })),
     ].sort((a, b) => b.date.getTime() - a.date.getTime());
 

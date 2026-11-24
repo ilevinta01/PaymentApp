@@ -33,6 +33,7 @@ export class StudentsService {
     const students = await this.prisma.student.findMany({
       where: {
         tenantId,
+        anonymizedAt: null,
         ...(user.role === Role.TEACHER ? { group: { teachers: { some: { id: user.sub } } } } : {}),
         ...(options.groupId ? { groupId: options.groupId } : {}),
         ...(options.search ? { fullName: { contains: options.search, mode: "insensitive" } } : {}),
@@ -122,10 +123,70 @@ export class StudentsService {
     if (!student) throw new NotFoundException("Ученик не найден");
     if (student._count.payments > 0 || student._count.individualLessonShares > 0) {
       throw new BadRequestException(
-        "У ученика есть история оплат — удалить его нельзя, чтобы не потерять финансовые записи. Переведите его в архивную группу или переведите в другую группу вместо удаления.",
+        "У ученика есть история оплат — удалить его нельзя, чтобы не потерять финансовые записи. Нажмите «Анонимизировать ученика»: личные данные будут стёрты, а платежи останутся в отчётах без привязки к человеку.",
       );
     }
     await this.prisma.student.delete({ where: { id } });
+    return { success: true };
+  }
+
+  // Право на удаление данных: стираем всё, что указывает на человека (ФИО, даты, телефоны,
+  // родителя, статус здоровья, Telegram), а платежи и занятия оставляем для финансовой истории.
+  // Действие необратимо. actorId пуст, если обезличивание сделано автоматически по сроку хранения.
+  async anonymize(tenantId: string, studentId: string, actorId: string | null, reason: "MANUAL" | "RETENTION") {
+    const student = await this.prisma.student.findFirst({ where: { id: studentId, tenantId } });
+    if (!student) throw new NotFoundException("Ученик не найден");
+    if (student.anonymizedAt) throw new BadRequestException("Данные этого ученика уже обезличены");
+
+    const label = `Ученик №${student.id.slice(0, 4).toUpperCase()} (обезличен)`;
+    const oldName = student.fullName;
+    const chatId = student.parentTelegramChatId;
+
+    // В журнале индивидуальных занятий имена учеников сохранены текстом — заменяем и там.
+    const logs = await this.prisma.individualLessonLog.findMany({
+      where: { tenantId, studentNames: { contains: oldName } },
+      select: { id: true, studentNames: true },
+    });
+
+    await this.prisma.$transaction([
+      this.prisma.student.update({
+        where: { id: studentId },
+        data: {
+          fullName: label,
+          dateOfBirth: null,
+          phone: null,
+          parentFullName: null,
+          parentPhone: null,
+          parentTelegramChatId: null,
+          status: "ACTIVE",
+          statusUntil: null,
+          anonymizedAt: new Date(),
+        },
+      }),
+      ...logs.map((log) =>
+        this.prisma.individualLessonLog.update({
+          where: { id: log.id },
+          data: {
+            studentNames: log.studentNames
+              .split(", ")
+              .map((name) => (name === oldName ? label : name))
+              .join(", "),
+          },
+        }),
+      ),
+      this.prisma.dataErasureLog.create({
+        data: { tenantId, studentId, studentLabel: label, reason, actorId },
+      }),
+    ]);
+
+    // Чат родителя (его имя и @username в Telegram) стираем, если им не пользуется другой ребёнок.
+    if (chatId) {
+      const stillUsed = await this.prisma.student.count({
+        where: { tenantId, parentTelegramChatId: chatId, anonymizedAt: null },
+      });
+      if (stillUsed === 0) await this.prisma.telegramChat.deleteMany({ where: { tenantId, chatId } });
+    }
+
     return { success: true };
   }
 

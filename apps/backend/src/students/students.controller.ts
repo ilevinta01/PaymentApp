@@ -50,6 +50,12 @@ export class StudentsController {
     return this.service.remove(user.tenantId, id);
   }
 
+  @Roles(Role.SUPER_ADMIN)
+  @Post(":id/anonymize")
+  anonymize(@CurrentUser() user: JwtPayload, @Param("id") id: string) {
+    return this.service.anonymize(user.tenantId, id, user.sub, "MANUAL");
+  }
+
   // Только Супер-Админ: сумма аванса произвольная (не привязана к фиксированной цене группы,
   // как обычный платёж преподавателя), поэтому доверять её ввод преподавателю нельзя —
   // тот же принцип, что и с произвольной суммой в обычной оплате (CreatePaymentDto.amount).

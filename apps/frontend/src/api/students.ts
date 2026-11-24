@@ -41,6 +41,12 @@ export async function deleteStudent(id: string) {
   return data;
 }
 
+// Необратимо: стирает персональные данные ученика, финансовая история остаётся.
+export async function anonymizeStudent(id: string) {
+  const { data } = await apiClient.post(`/students/${id}/anonymize`);
+  return data;
+}
+
 export async function depositBalance(
   studentId: string,
   payload: { amount: number; paymentMethod: PaymentMethod; note?: string },
