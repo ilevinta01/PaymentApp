@@ -17,12 +17,16 @@ export class MailService {
   private transporter: Transporter | null = null;
   private readonly from: string;
   private readonly brevoKey: string | undefined;
+  private readonly relayUrl: string | undefined;
+  private readonly relaySecret: string | undefined;
 
   constructor() {
     this.brevoKey = process.env.BREVO_API_KEY || undefined;
+    this.relayUrl = process.env.MAIL_RELAY_URL || undefined;
+    this.relaySecret = process.env.MAIL_RELAY_SECRET || undefined;
     const host = process.env.SMTP_HOST;
     this.from = process.env.MAIL_FROM || process.env.SMTP_USER || "Оплата <no-reply@localhost>";
-    if (!this.brevoKey && host) {
+    if (!this.brevoKey && !this.relayUrl && host) {
       const port = Number(process.env.SMTP_PORT ?? 587);
       this.transporter = createTransport({
         host,
@@ -41,7 +45,7 @@ export class MailService {
   }
 
   get isConfigured() {
-    return this.transporter !== null || !!this.brevoKey;
+    return this.transporter !== null || !!this.brevoKey || !!this.relayUrl;
   }
 
   private parseFrom(): { name?: string; email: string } {
@@ -51,6 +55,28 @@ export class MailService {
 
   /** Возвращает true, если письмо принято почтовым сервисом. */
   async send(to: string, subject: string, text: string, html: string): Promise<boolean> {
+    // Скрипт Google Apps Script, привязанный к ящику отправителя (см. файл «Скрипт отправки почты»).
+    if (this.relayUrl) {
+      try {
+        const res = await fetch(this.relayUrl, {
+          method: "POST",
+          headers: { "content-type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ secret: this.relaySecret, to, subject, text, html }),
+          redirect: "follow",
+          signal: AbortSignal.timeout(20_000),
+        });
+        const body = (await res.text()).slice(0, 300);
+        if (!res.ok || !body.includes('"ok":true')) {
+          this.logger.error(`Почтовый скрипт отклонил письмо для ${to}: HTTP ${res.status} ${body}`);
+          return false;
+        }
+        return true;
+      } catch (err) {
+        this.logger.error(`Не удалось отправить письмо на ${to} через скрипт Google: ${(err as Error).message}`);
+        return false;
+      }
+    }
+
     if (this.brevoKey) {
       try {
         const res = await fetch("https://api.brevo.com/v3/smtp/email", {
