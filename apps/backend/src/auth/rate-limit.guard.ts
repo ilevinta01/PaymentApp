@@ -1,5 +1,6 @@
 import { CanActivate, ExecutionContext, HttpException, HttpStatus, Injectable, SetMetadata } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
+import { clientIp } from "../common/client-ip";
 
 const RATE_LIMIT_KEY = "rateLimit";
 
@@ -24,7 +25,7 @@ export class RateLimitGuard implements CanActivate {
     if (!cfg) return true;
 
     const req = context.switchToHttp().getRequest();
-    const key = `${req.ip}|${req.method}|${req.route?.path ?? req.url}`;
+    const key = `${clientIp(req)}|${req.method}|${req.route?.path ?? req.url}`;
     const now = Date.now();
     const windowMs = cfg.windowSeconds * 1000;
     const recent = (this.hits.get(key) ?? []).filter((t) => now - t < windowMs);
