@@ -23,19 +23,23 @@ export default function SetPasswordPage() {
         }}
         className="w-full max-w-sm bg-white rounded-xl shadow p-6 space-y-4"
       >
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900">Задайте пароль</h1>
-          <p className="text-sm text-slate-500">
-            Придумайте пароль для входа: минимум 8 символов, хотя бы одна буква и одна цифра.
-          </p>
-        </div>
+        {mutation.isSuccess ? (
+          <h1 className="text-xl font-semibold text-slate-900">Пароль сохранён</h1>
+        ) : (
+          <div>
+            <h1 className="text-xl font-semibold text-slate-900">Задайте пароль</h1>
+            <p className="text-sm text-slate-500">
+              Придумайте пароль для входа: минимум 8 символов, хотя бы одна буква и одна цифра.
+            </p>
+          </div>
+        )}
 
         {!token ? (
           <p className="text-sm text-red-600">Ссылка неполная. Откройте её из письма ещё раз.</p>
         ) : mutation.isSuccess ? (
           <div className="space-y-3">
             <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">
-              Готово! Пароль сохранён, email подтверждён. Теперь можно войти.
+              Email подтверждён. Теперь войдите с новым паролем.
             </p>
             <Link
               to="/login"
