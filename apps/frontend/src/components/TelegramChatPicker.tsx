@@ -11,7 +11,15 @@ const CONSENT_LABEL: Record<ConsentStatus, { text: string; className: string }> 
 
 // Помогает привязать родителя без ручного поиска chat_id: показывает всех, кто написал боту центра
 // (/start), и даёт выбрать одним кликом. Рядом видно, принял ли человек политику конфиденциальности.
-export default function TelegramChatPicker({ onSelect }: { onSelect: (chatId: string) => void }) {
+export default function TelegramChatPicker({
+  onSelect,
+  label = "Найти чат родителя",
+  emptyHint = "Пока никто не писал боту. Попросите родителя найти бота и отправить ему /start, затем нажмите ещё раз.",
+}: {
+  onSelect: (chatId: string) => void;
+  label?: string;
+  emptyHint?: string;
+}) {
   const [open, setOpen] = useState(false);
   const { data: settings } = useQuery({ queryKey: ["tenant-settings"], queryFn: getTenantSettings });
   const { data: chats, isFetching, isError, refetch } = useQuery({
@@ -33,7 +41,7 @@ export default function TelegramChatPicker({ onSelect }: { onSelect: (chatId: st
         }}
         className="text-sm font-medium text-[var(--brand-primary)]"
       >
-        Найти чат родителя
+        {label}
       </button>
       {open && (
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm">
@@ -41,7 +49,7 @@ export default function TelegramChatPicker({ onSelect }: { onSelect: (chatId: st
           {isError && <p className="text-red-600">Не удалось получить список. Попробуйте ещё раз.</p>}
           {!isFetching && !isError && chats?.length === 0 && (
             <p className="text-slate-500">
-              Пока никто не писал боту. Попросите родителя найти бота и отправить ему /start, затем нажмите ещё раз.
+              {emptyHint}
             </p>
           )}
           {!isFetching && chats && chats.length > 0 && (

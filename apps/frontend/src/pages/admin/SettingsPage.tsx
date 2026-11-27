@@ -269,7 +269,7 @@ export default function SettingsPage() {
           <select
             value={retention}
             onChange={(e) => setRetention(e.target.value)}
-            className="flex-1 rounded-lg border border-slate-300 px-3 py-2"
+            className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2"
           >
             <option value="">Не обезличивать автоматически</option>
             {[1, 2, 3, 5, 7].map((y) => (

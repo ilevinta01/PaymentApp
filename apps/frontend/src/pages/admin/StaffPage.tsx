@@ -194,7 +194,11 @@ function StaffRow({
               {member.telegramChatId ? (
                 <span className="text-sm text-emerald-600">Telegram привязан</span>
               ) : (
-                <TelegramChatPicker onSelect={(chatId) => telegramMutation.mutate(chatId)} />
+                <TelegramChatPicker
+                  onSelect={(chatId) => telegramMutation.mutate(chatId)}
+                  label="Найти чат"
+                  emptyHint="Пока никто не писал боту. Попросите сотрудника найти бота и отправить ему /start, затем нажмите ещё раз."
+                />
               )}
             </div>
           )}
@@ -209,7 +213,11 @@ function StaffRow({
           {member.telegramChatId ? (
             <span className="text-sm text-emerald-600">привязан</span>
           ) : (
-            <TelegramChatPicker onSelect={(chatId) => telegramMutation.mutate(chatId)} />
+        <TelegramChatPicker
+              onSelect={(chatId) => telegramMutation.mutate(chatId)}
+              label="Найти чат"
+              emptyHint="Пока никто не писал боту. Попросите сотрудника найти бота и отправить ему /start, затем нажмите ещё раз."
+            />
           )}
         </div>
       )}
